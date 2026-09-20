@@ -10,5 +10,8 @@ Follow the guides in workflow order:
 5. [Final-200 Clean evaluation dataset](evaluation-dataset.md) defines the current
    curated benchmark and its update record.
 
-[Reward v3](reward-v3.md) is the detailed specification shared by collection,
-GRPO and evaluation.
+[Reward v4](reward-v4-design.md) is the active specification shared by
+collection, GRPO and evaluation. Use the
+[complete Reward v4 rerun workflow](reward-v4-workflow.md) for fresh SFT data,
+GRPO data/training, strict split isolation and Final-200 evaluation. The
+[Reward v3 document](reward-v3.md) is retained as historical context only.

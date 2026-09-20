@@ -164,13 +164,15 @@ def build_comparison_data(evaluation_dir: Path) -> dict:
         "outcome_order": [
             "gold_purchase",
             "valid_alternative_purchase",
-            "partial_alternative_purchase",
+            "acceptable_compromise_purchase",
             "wrong_purchase",
+            "unverified_purchase",
+            "reward_unverifiable",
+            "stop_with_acceptable_candidate",
             "repeat_loop",
             "max_steps",
             "early_abstain",
             "graceful_stop",
-            "reward_unverifiable",
             "unknown",
         ],
         "histogram_labels": [
@@ -189,7 +191,6 @@ def build_comparison_data(evaluation_dir: Path) -> dict:
             if all(task_id in set(model["success_ids"]) for model in models)
         ),
         "best_model": best["name"],
-        "analysis": MODEL_ANALYSIS,
     }
 
 
@@ -211,7 +212,7 @@ table{border-collapse:collapse;width:100%;min-width:900px}th,td{padding:10px;bor
 .notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.note{padding:14px;border:1px solid var(--line);border-radius:12px;background:#fbfdff}.note ul{padding-left:20px;margin:7px 0}.task-ids{word-break:break-all;padding:12px;background:#f8fafc;border-radius:10px;color:#475569}.links a{display:inline-block;margin:5px 10px 5px 0;padding:7px 11px;border-radius:9px;background:#eff6ff;color:#1d4ed8;text-decoration:none}
 @media(max-width:900px){main{padding:14px}.grid{grid-template-columns:1fr}.kpis,.notes{grid-template-columns:1fr 1fr}.hist{grid-template-columns:100px repeat(10,minmax(15px,1fr))}.hist-labels{grid-template-columns:100px repeat(10,minmax(15px,1fr))}}
 </style></head><body><main>
-<section class="hero"><div class="muted">Shopping Agent · Final-200</div><h1>多模型轨迹与 Bad Case 综合报告</h1><p>同一套 200 题、6 个模型。先看成功率和 Reward 分布，再看失败轨迹为什么会错、强模型强在哪里。</p><div class="kpis" id="kpis"></div><div class="links" id="links"></div></section>
+<section class="hero"><div class="muted">Shopping Agent · Final-200 · Reward v4</div><h1>多模型轨迹与 Bad Case 综合报告</h1><p>同一套固定 200 题、同一份 Reward v4 合同。比较严格 Gold、证据质量、失败类型、Reward 分布与交互成本。</p><div class="kpis" id="kpis"></div><div class="links" id="links"></div></section>
 <div class="grid">
 <section class="card"><h2>严格成功率</h2><div id="success-bars"></div></section>
 <section class="card"><h2>任务共识难度</h2><p class="muted">横轴含义：一道题被多少个模型做对。</p><div id="agreement-bars"></div></section>
@@ -225,8 +226,8 @@ table{border-collapse:collapse;width:100%;min-width:900px}th,td{padding:10px;bor
 </div></main>
 <script>
 const D=__REPORT_DATA__;
-const COLORS={gold_purchase:'#16a34a',valid_alternative_purchase:'#4ade80',partial_alternative_purchase:'#f59e0b',wrong_purchase:'#ef4444',repeat_loop:'#7c3aed',max_steps:'#db2777',early_abstain:'#94a3b8',graceful_stop:'#38bdf8',reward_unverifiable:'#a16207',unknown:'#cbd5e1'};
-const LABELS={gold_purchase:'正确购买',valid_alternative_purchase:'有效替代品',partial_alternative_purchase:'部分匹配',wrong_purchase:'买错商品',repeat_loop:'重复循环',max_steps:'步数耗尽',early_abstain:'过早放弃',graceful_stop:'主动停止',reward_unverifiable:'无法核验',unknown:'未形成终局'};
+const COLORS={gold_purchase:'#16a34a',valid_alternative_purchase:'#4ade80',acceptable_compromise_purchase:'#f59e0b',wrong_purchase:'#ef4444',unverified_purchase:'#f97316',reward_unverifiable:'#a16207',stop_with_acceptable_candidate:'#dc2626',repeat_loop:'#7c3aed',max_steps:'#db2777',early_abstain:'#94a3b8',graceful_stop:'#38bdf8',unknown:'#cbd5e1'};
+const LABELS={gold_purchase:'严格 Gold',valid_alternative_purchase:'完全满足的替代商品',acceptable_compromise_purchase:'授权妥协购买',wrong_purchase:'买错商品',unverified_purchase:'证据不完整购买',reward_unverifiable:'奖励不可核验',stop_with_acceptable_candidate:'发现可接受候选后停止',repeat_loop:'重复循环',max_steps:'步数耗尽',early_abstain:'过早放弃',graceful_stop:'有依据停止',unknown:'未形成终局'};
 const pct=x=>(x*100).toFixed(1)+'%'; const n=x=>Number(x).toFixed(3); const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sorted=[...D.models].sort((a,b)=>b.success_rate-a.success_rate); const total=D.models[0].tasks;
 document.querySelector('#kpis').innerHTML=`<div class="kpi"><span>模型</span><b>${D.models.length}</b></div><div class="kpi"><span>每模型任务</span><b>${total}</b></div><div class="kpi"><span>最高严格成功率</span><b>${pct(sorted[0].success_rate)}</b><small>${esc(sorted[0].name)}</small></div><div class="kpi"><span>全模型共同失败</span><b>${D.all_failed_task_ids.length}</b></div>`;
@@ -241,10 +242,10 @@ document.querySelector('#hist-labels').innerHTML='<b></b>'+D.histogram_labels.ma
 document.querySelector('#legend').innerHTML=D.outcome_order.map(k=>`<span><i style="background:${COLORS[k]}"></i>${LABELS[k]}</span>`).join('');
 document.querySelector('#outcomes').innerHTML=sorted.map(m=>`<div class="outcome-row"><b>${esc(m.name)}</b><div class="stack">${D.outcome_order.map(k=>`<div class="seg" title="${LABELS[k]}：${m.outcomes[k]||0}" style="width:${(m.outcomes[k]||0)/m.tasks*100}%;background:${COLORS[k]}"></div>`).join('')}</div></div>`).join('');
 const best=sorted[0], weakest=sorted[sorted.length-1];
-document.querySelector('#strengths').innerHTML=`<p><b>${esc(best.name)}</b> 是这批里最稳的：严格成功 ${best.successes}/${best.tasks}（${pct(best.success_rate)}），平均只走 ${best.average_steps.toFixed(2)} 步。它不是“想得更久”，而是更常在前几次搜索里锁定靠谱候选，利用商品页已有的标题、属性、规格和价格，够用就选、选完就买。</p><p>和 GLM-5.2 逐题比，两者共同做对 114 题；Qwen Max 单独做对 35 题，GLM 单独做对 11 题。Qwen Max 的成功轨迹平均 7.44 步，GLM 是 9.31 步。GLM 的主要损失是 49 条 assistant_final——不少轨迹已经想清楚下一步，甚至选好规格，却没有真的发工具调用。</p><p>最明显的差距在“能不能收尾”：${esc(best.name)} 的重复循环只有 ${best.outcomes.repeat_loop||0} 条、未形成终局 ${best.outcomes.unknown||0} 条；${esc(weakest.name)} 分别是 ${weakest.outcomes.repeat_loop||0} 和 ${weakest.outcomes.unknown||0}。强模型少走回头路，也更少在已经接近答案时卡住。不过 Qwen Max 偶尔太果断，会把近似商品当答案；改进方向是加一遍轻量规格检查，不是学 GLM 把所有空页签都看一遍。</p>`;
-document.querySelector('#model-notes').innerHTML=sorted.map(m=>{const a=D.analysis[m.key];return `<article class="note"><h3>${esc(m.name)}</h3><p><b>${esc(a.portrait)}</b></p><ul>${a.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p><b>怎么改：</b>${esc(a.fix)}</p></article>`}).join('');
-document.querySelector('#common-notes').innerHTML=`<p><b>第一类是“看标题就退”。</b>候选标题不够像时，模型常常打开后立即返回，没有继续看完整属性、规格轴和变体价；这在 Qwen Plus（64 个 bad case）、DeepSeek Pro（29 个）和 DeepSeek Flash（28 个）里尤其明显。</p><p><b>第二类是“找到后不收口”。</b>正确候选已经出现，模型仍换同义搜索词、重复打开商品或来回切规格。强模型 Qwen Max 只有 4 个 repeat_loop，Qwen Plus 有 70 个，差距主要就在这里。</p><p><b>第三类是“规格轴没管住”。</b>型号、颜色、尺码、容量、数量经常只选一部分，或者点过但最终购买状态没保留。预算也应按最终变体价核对，而不是拿列表价格凭感觉。</p><p><b>第四类是“页面状态没跟上”。</b>模型拿旧页面的 ASIN/按钮继续点，或给无参工具乱传参数。DeepSeek Pro 的 29 条 invalid_action_limit 是最集中的系统性问题。</p><p>${D.all_failed_task_ids.length} 道题六个模型全败，说明这部分通常有大量近似品，必须靠详情或精确规格区分；${D.all_succeeded_task_ids.length} 道题六个模型全对，说明基础搜索和明显匹配项并不是主要瓶颈。</p>`;
-document.querySelector('#data-notes').innerHTML=`<p>raw bad 数不能全当成模型真实错误。逐轨迹检查发现几类疑似标签/比较器问题：</p><ul><li><b>需求与 gold 冲突：</b>5703 用户明确要 7 号机针，gold 却要 8 号；21785 用户要 2XL，gold 却是 XL；5510 用户要 L 码，gold 却含 S-2只装。</li><li><b>需求没写、gold 却强制：</b>4786 没写尺码却要求 XL女175；3368 只要求高度 15cm 以下，9cm 合理但 gold 强制 12cm。</li><li><b>字符归一化：</b>11168、5904、2352、12860 存在 ➕、爱心、大小写等字符串看起来等价却匹配失败。</li><li><b>口语预算被当硬上限：</b>“60 元出头”买 62、“40 左右”买 45、“170 上下”买 171 都会被判失败。报告保留官方严格成功率，但这些案例不宜直接归因于模型推理。</li></ul>`;
+document.querySelector('#strengths').innerHTML=`<p><b>${esc(best.name)}</b> 的严格 Gold 成功率最高：${best.successes}/${best.tasks}（${pct(best.success_rate)}），平均 ${best.average_steps.toFixed(2)} 步；<b>${esc(weakest.name)}</b> 为 ${weakest.successes}/${weakest.tasks}（${pct(weakest.success_rate)}）。</p><p>比较时应同时查看 Reward 有效率、错误购买、证据不完整购买、授权妥协购买和操作步数。Reward v4 的正分不等同于严格 Gold；严格成功只认合法、证据完整且 reward_valid=true 的 gold_purchase。</p><p>循环或步数耗尽：${sorted.map(m=>`${esc(m.name)} ${(m.outcomes.repeat_loop||0)+(m.outcomes.max_steps||0)}`).join('；')}。</p>`;
+document.querySelector('#model-notes').innerHTML=sorted.map(m=>{const bad=(m.outcomes.wrong_purchase||0),unverified=(m.outcomes.unverified_purchase||0),invalid=(m.outcomes.reward_unverifiable||0),compromise=(m.outcomes.acceptable_compromise_purchase||0);return `<article class="note"><h3>${esc(m.name)}</h3><p>严格成功 <b>${m.successes}/${m.tasks}</b>，Reward 有效率 <b>${pct(m.reward_valid_rate)}</b>。</p><ul><li>错误购买：${bad}</li><li>证据不完整 / 不可核验：${unverified} / ${invalid}</li><li>授权妥协购买：${compromise}</li><li>平均步数：${m.average_steps.toFixed(2)}</li></ul></article>`}).join('');
+document.querySelector('#common-notes').innerHTML=`<p><b>严格成功差异</b>由正确购买、证据覆盖和能否及时收口共同决定。错误购买反映硬条件违反；unverified_purchase 反映订单事实可知但 Actor 证据不足；reward_unverifiable 反映合同或订单事实本身不可评分。</p><p>${D.all_failed_task_ids.length} 道题所有模型都未达到严格 Gold，${D.all_succeeded_task_ids.length} 道题所有模型都达到严格 Gold。应结合单模型任务明细检查共同失败，而不能只看平均 Reward。</p>`;
+document.querySelector('#data-notes').innerHTML=`<p>本报告按 Reward v4 冻结合同生成。Final-200 保持固定分母；基础设施无效、奖励不可核验和未形成终局的任务不会从分母中删除。若运行时哈希、数据隔离门禁或评测协议不一致，应先修复运行而不是解释模型差异。</p>`;
 document.querySelector('#all-failed-count').textContent=D.all_failed_task_ids.length;document.querySelector('#all-failed').textContent=D.all_failed_task_ids.join(', ');document.querySelector('#all-succeeded-count').textContent=D.all_succeeded_task_ids.length;document.querySelector('#all-succeeded').textContent=D.all_succeeded_task_ids.join(', ');
 </script></body></html>'''
 

@@ -6,7 +6,7 @@ This repository supports one workflow only:
 Baseline → SFT → GRPO → Evaluation
 ```
 
-The runtime contract is ShopSimulator Environment v2.1, Reward v3, observation
+The runtime contract is ShopSimulator Environment v2.1, Reward v4, observation
 v2 and tool schema v2. Do not add compatibility launchers, historical datasets,
 old benchmarks, machine-specific paths or experiment journals.
 

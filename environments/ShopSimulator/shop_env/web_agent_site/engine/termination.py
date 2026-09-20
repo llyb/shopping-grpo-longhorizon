@@ -50,6 +50,7 @@ class EvidenceProgressTracker:
     last_signature: str | None = None
     consecutive_repeats: int = 0
     no_progress_steps: int = 0
+    redundant_actions: int = 0
     seen_asins: set[str] = field(default_factory=set)
     opened_asins: set[str] = field(default_factory=set)
     runtime_result_fingerprints: set[str] = field(default_factory=set)
@@ -76,7 +77,8 @@ class EvidenceProgressTracker:
     ):
         self.steps += 1
         signature = canonical_action(action_name, action_argument)
-        if signature == self.last_signature:
+        repeated_signature = signature == self.last_signature
+        if repeated_signature:
             self.consecutive_repeats += 1
         else:
             self.consecutive_repeats = 0
@@ -164,6 +166,8 @@ class EvidenceProgressTracker:
             self.no_progress_steps = 0
         else:
             self.no_progress_steps += 1
+            if repeated_signature:
+                self.redundant_actions += 1
 
         reason = None
         if self.consecutive_repeats >= self.exact_repeat_limit:
@@ -179,6 +183,7 @@ class EvidenceProgressTracker:
             "action_signature": signature,
             "consecutive_repeats": self.consecutive_repeats,
             "no_progress_steps": self.no_progress_steps,
+            "redundant_actions": self.redundant_actions,
             # Compatibility field: evidence that counts toward bounded abstention
             # qualification and metrics, not the liveness decision.
             "evidence_added": credited_evidence_added,

@@ -1,16 +1,16 @@
 {
   "schema_version": "shopping-blind-asset-guard-v1",
   "manifest_version": 1,
-  "asset": "shop_benchmark_reward_v3_final_200_clean",
+  "asset": "shop_benchmark_reward_v4_final_200_clean",
   "split_role": "blind_final_test",
-  "task_sha256": "d99112a20ef47534c27a32e4b38229bf048dcc6b06fef2e3e919aac3093662f5",
+  "task_sha256": "345ee03df8be15a964f219677347fda7ccd9a10302f0896e04b0ee4e91ab13a1",
   "task_count": 200,
-  "metadata_sha256": "fc62d0d9cb16bf9bcc68a689a6bf17236adc923acaa56ff136cf5fa7ecff4442",
+  "metadata_sha256": "48c4ce909652125e1ccc05e10d7816ae4f899a1d98f507ee834be038d60afea1",
   "required_metadata": {
-    "asset": "shop_benchmark_reward_v3_final_200_clean",
-    "contract": "environment-v2.1/reward-v3/curated-final200-clean-v1",
+    "asset": "shop_benchmark_reward_v4_final_200_clean",
+    "contract": "environment-v2.1/reward-v4/curated-final200-clean-v1",
     "environment_version": "shopsimulator-environment-v2.1",
-    "reward_version": "shopsimulator-reward-v3",
+    "reward_version": "shopsimulator-reward-v4",
     "evaluated": false
   },
   "task_ids_resource": "blind_final_task_ids.json"

@@ -1,4 +1,4 @@
-"""Lightweight, consumer-oriented terminal Reward v3."""
+"""Reward entrypoints with v3 input compatibility and v4 as the environment path."""
 
 from __future__ import annotations
 
@@ -27,9 +27,20 @@ from web_agent_site.engine.variant_price import (
     compare_required_options,
     resolve_variant_price,
 )
+from web_agent_site.engine.reward_v4 import (
+    REWARD_VERSION as REWARD_V4_VERSION,
+    is_v4_goal,
+    score_abstain as _score_abstain_v4,
+    score_purchase as _score_purchase_v4,
+    fixed_termination as _fixed_termination_v4,
+)
 
 
-REWARD_VERSION = "shopsimulator-reward-v3"
+REWARD_V3_VERSION = "shopsimulator-reward-v3"
+# The environment config imports this symbol, so v4 is the single active
+# runtime contract.  Legacy callers are dispatched by the absence of a v4
+# requirement contract and still receive Reward v3 diagnostics.
+REWARD_VERSION = REWARD_V4_VERSION
 DIMENSION_WEIGHTS = {
     "brand": 0.35,
     "model": 0.25,
@@ -70,7 +81,7 @@ class RewardResult:
         dimensions = preference_scoring.get("dimensions") or {}
         payload.update(
             {
-                "reward_version": REWARD_VERSION,
+                "reward_version": REWARD_V3_VERSION,
                 "terminal_utility": self.reward,
                 "purchase_success": self.reward_type
                 in {"gold_purchase", "valid_alternative_purchase"},
@@ -350,7 +361,7 @@ def _explicit_price_resolution(price: object) -> dict:
     }
 
 
-def evaluate_purchase(
+def _evaluate_purchase_v3(
     product: dict,
     goal: dict,
     *,
@@ -422,7 +433,7 @@ def evaluate_purchase(
     )
 
 
-def evaluate_candidate_eligibility(product: dict, goal: dict) -> dict:
+def _evaluate_candidate_eligibility_v3(product: dict, goal: dict) -> dict:
     """Determine whether an opened candidate is sufficiently acceptable to block abstention."""
     selected, option_resolution = candidate_options_for_evaluation(
         product,
@@ -459,7 +470,7 @@ def evaluate_candidate_eligibility(product: dict, goal: dict) -> dict:
     }
 
 
-def evaluate_abstain(
+def _evaluate_abstain_v3(
     *,
     effective_result_sets: int,
     opened_candidates: int,
@@ -496,7 +507,7 @@ def evaluate_abstain(
     )
 
 
-def fixed_termination(
+def _fixed_termination_v3(
     reason: str,
     rewards: dict[str, float] | None = None,
 ) -> RewardResult:
@@ -513,3 +524,145 @@ def fixed_termination(
         weighted_score=0.0,
         evidence={},
     )
+
+
+def evaluate_purchase(
+    product: dict,
+    goal: dict,
+    *,
+    selected_options: object,
+    price_resolution: dict | None = None,
+    price: object = None,
+    rewards: dict | None = None,
+    evidence: dict | None = None,
+    redundant_actions: int = 0,
+    invalid_actions: int = 0,
+):
+    """Score a terminal purchase under v4 or the explicit legacy path."""
+    configured_version = (rewards or {}).get("version")
+    if is_v4_goal(goal) or configured_version == REWARD_V4_VERSION:
+        return _score_purchase_v4(
+            product,
+            goal,
+            selected_options=selected_options,
+            price_resolution=price_resolution,
+            price=price,
+            evidence=evidence,
+            rewards=rewards,
+            redundant_actions=redundant_actions,
+            invalid_actions=invalid_actions,
+        )
+    return _evaluate_purchase_v3(
+        product,
+        goal,
+        selected_options=selected_options,
+        price_resolution=price_resolution,
+        price=price,
+        rewards=rewards,
+    )
+
+
+def evaluate_candidate_eligibility(
+    product: dict,
+    goal: dict,
+    evidence: dict | None = None,
+    *,
+    selected_options: dict | None = None,
+    price_resolution: dict | None = None,
+) -> dict:
+    """Return candidate acceptability while preserving the v3 result keys."""
+    if not is_v4_goal(goal):
+        return _evaluate_candidate_eligibility_v3(product, goal)
+    required_options = goal.get("required_options_by_key")
+    if not isinstance(required_options, dict):
+        # Hand-authored/legacy callers may keep option requirements only in
+        # the frozen contract.  Derive a deterministic choice for exact or
+        # finite-set requirements; ambiguous numeric choices stay
+        # unverifiable rather than being guessed.
+        required_options = {}
+        contract = goal.get("reward_contract") or goal.get("contract") or {}
+        for item in contract.get("must") or []:
+            if not isinstance(item, dict) or item.get("field") not in {"option", "color", "size", "capacity", "storage", "sku_option"}:
+                continue
+            axis = item.get("axis") or item.get("field")
+            value = item.get("value")
+            if item.get("operator") in {"eq", "in"} and axis and value not in (None, []):
+                required_options[str(axis)] = {"value": value[0] if isinstance(value, list) else value}
+    if selected_options is None:
+        selected, option_resolution = candidate_options_for_evaluation(product, required_options)
+    else:
+        selected = dict(selected_options)
+        option_resolution = {"status": PASS, "method": "actor_selected_options"}
+    if price_resolution is None:
+        price_resolution = resolve_variant_price(product, selected)
+    result = _score_purchase_v4(
+        product,
+        goal,
+        selected_options=selected,
+        price_resolution=price_resolution,
+        evidence=evidence,
+    )
+    # A candidate only becomes known after the actor has received enough
+    # evidence for the same SKU.  Backend facts alone must never make a stop
+    # action look justified.
+    known_acceptable = bool(
+        evidence is not None
+        and result.acceptable_purchase
+        and result.reward_valid
+        and float(result.evidence.get("evidence_coverage", 0.0)) >= 1.0
+    )
+    return {
+        "status": PASS if known_acceptable else FAIL,
+        "known_acceptable": known_acceptable,
+        "known_valid": known_acceptable,
+        "selected_options": selected,
+        "option_resolution": option_resolution,
+        "price_resolution": price_resolution,
+        "hard_gates": result.hard_gates,
+        "match_score": result.weighted_score,
+        "evidence_coverage": float(result.evidence.get("evidence_coverage", 0.0)),
+    }
+
+
+def evaluate_abstain(
+    *,
+    effective_result_sets: int,
+    opened_candidates: int,
+    known_acceptable_candidates: int | None = None,
+    known_valid_candidates: int | None = None,
+    candidate_quality: float | None = None,
+    waste_cost: float = 0.0,
+    rewards: dict | None = None,
+):
+    configured_version = (rewards or {}).get("version")
+    if configured_version == REWARD_V4_VERSION:
+        known_count = int(
+            known_acceptable_candidates
+            if known_acceptable_candidates is not None
+            else known_valid_candidates or 0
+        )
+        quality = (
+            float(candidate_quality)
+            if candidate_quality is not None
+            else (1.0 if int(opened_candidates) > 0 else 0.0)
+        )
+        return _score_abstain_v4(
+            effective_result_sets=effective_result_sets,
+            candidate_quality=quality,
+            known_acceptable_candidates=known_count,
+            waste_cost=waste_cost,
+            rewards=rewards,
+        )
+    return _evaluate_abstain_v3(
+        effective_result_sets=effective_result_sets,
+        opened_candidates=opened_candidates,
+        known_acceptable_candidates=known_acceptable_candidates,
+        known_valid_candidates=known_valid_candidates,
+        rewards=rewards,
+    )
+
+
+def fixed_termination(reason: str, rewards: dict | None = None):
+    if (rewards or {}).get("version") == REWARD_V4_VERSION:
+        return _fixed_termination_v4(reason, rewards=rewards)
+    return _fixed_termination_v3(reason, rewards=rewards)

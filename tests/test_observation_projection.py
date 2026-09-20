@@ -119,6 +119,69 @@ class ObservationProjectionTest(unittest.TestCase):
         self.assertEqual(visible, raw)
         self.assertFalse(meta.truncated)
 
+    def test_structured_product_detail_never_truncates_reward_evidence(self):
+        raw = render_structured_observation(
+            {
+                "observation_version": "shopping-observation-v2",
+                "page_type": "product_detail",
+                "search_available": False,
+                "actions": ["back to search", "buy now"],
+                "product": {
+                    "asin": "12345678",
+                    "title": "商品",
+                    "brand": "品牌",
+                    "category": "类目",
+                    "price": 20,
+                    "key_attributes": ["重要属性" * 200],
+                },
+                "selected_price": 20,
+                "selected_options": {},
+                "available_options": {},
+            }
+        )
+        with self.assertRaisesRegex(
+            ObservationProjectionError,
+            "refusing to truncate reward evidence",
+        ):
+            project_observation(
+                "open_product",
+                raw,
+                count_tokens=len,
+                detail_token_budget=128,
+            )
+
+    def test_structured_information_subpage_never_truncates_reward_evidence(self):
+        raw = render_structured_observation(
+            {
+                "observation_version": "shopping-observation-v2",
+                "page_type": "information_subpage",
+                "search_available": False,
+                "actions": ["< prev"],
+                "product": {
+                    "asin": "12345678",
+                    "title": "商品",
+                    "brand": "品牌",
+                    "category": "类目",
+                    "price": 20,
+                    "key_attributes": [],
+                },
+                "selected_options": {},
+                "available_options": {},
+                "subpage": "features",
+                "content": "关键功能" * 200,
+            }
+        )
+        with self.assertRaisesRegex(
+            ObservationProjectionError,
+            "refusing to truncate reward evidence",
+        ):
+            project_observation(
+                "view_features",
+                raw,
+                count_tokens=len,
+                detail_token_budget=128,
+            )
+
     def test_generic_projection_keeps_complete_footer(self):
         raw = (
             "Description " + "detail " * 200 + "TAIL_SPECIFICATION"

@@ -2,7 +2,7 @@
 
 The collector records everything needed for auditing in ``raw.jsonl``. This
 module is the deterministic second half of the pipeline: it accepts only strict
-Reward v3 gold purchases, removes private reasoning and terminal Reward text,
+Reward v4 gold purchases, removes private reasoning and terminal Reward text,
 excludes held-out tasks, and creates task-disjoint train/validation files.
 """
 
@@ -23,7 +23,7 @@ from shopping_grpo.environment.tools import SHOP_TOOL_SCHEMAS, tool_call_to_acti
 from shopping_grpo.training.sft.dataset import split_rows_by_task
 
 
-COLLECTION_SCHEMA_VERSION = "shopping-sft-collection-v1"
+COLLECTION_SCHEMA_VERSION = "shopping-sft-collection-v2"
 ALLOWED_MESSAGE_KEYS = {"role", "content", "tool_calls", "tool_call_id", "name"}
 ALLOWED_TOOL_CALL_KEYS = {"id", "type", "function"}
 ALLOWED_FUNCTION_KEYS = {"name", "arguments"}
@@ -41,6 +41,8 @@ def acceptance_reasons(trajectory: dict) -> tuple[bool, list[str]]:
         reasons.append("has_error")
     if trajectory.get("release_error"):
         reasons.append("release_error")
+    if trajectory.get("infrastructure_invalid") is True:
+        reasons.append("infrastructure_invalid")
     if trajectory.get("status") != "done":
         reasons.append("status_not_done")
     if trajectory.get("done") is not True:
@@ -54,16 +56,22 @@ def acceptance_reasons(trajectory: dict) -> tuple[bool, list[str]]:
     ):
         reasons.append("missing_buy")
 
-    if reward.get("reward_version") != "shopsimulator-reward-v3":
-        reasons.append("reward_v3_required")
+    if reward.get("reward_version") != "shopsimulator-reward-v4":
+        reasons.append("reward_v4_required")
     if reward.get("reward_type") != "gold_purchase":
-        reasons.append("reward_v3_not_gold_purchase")
+        reasons.append("reward_v4_not_gold_purchase")
     if reward.get("reward_valid") is not True:
-        reasons.append("reward_v3_invalid")
+        reasons.append("reward_v4_invalid")
+    if reward.get("sampling_invalid") is not False:
+        reasons.append("sampling_invalid")
     if reward.get("purchase_success") is not True:
         reasons.append("purchase_not_successful")
     if reward.get("termination_reason") != "gold_purchase":
         reasons.append("termination_not_gold_purchase")
+    if reward.get("strict_success") is not True:
+        reasons.append("strict_success_required")
+    if float(reward.get("evidence_coverage", 0.0)) < 1.0:
+        reasons.append("incomplete_key_evidence")
 
     for index, message in enumerate(trajectory.get("messages") or []):
         if (
@@ -198,7 +206,7 @@ def build_collection_artifacts(
     metadata = {
         **summary,
         "environment": "shopsimulator-environment-v2.1",
-        "reward": "shopsimulator-reward-v3",
+        "reward": "shopsimulator-reward-v4",
         "validation_ratio": float(validation_ratio),
         "split_seed": int(seed),
         "collection_config": deepcopy(collection_config or {}),

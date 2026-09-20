@@ -107,10 +107,13 @@ def _accepted_trajectory(task_id=1):
             "done": True,
             "over": True,
             "reward_detail": {
-                "reward_version": "shopsimulator-reward-v3",
+                "reward_version": "shopsimulator-reward-v4",
                 "reward_type": "gold_purchase",
                 "reward_valid": True,
+                "sampling_invalid": False,
                 "purchase_success": True,
+                "strict_success": True,
+                "evidence_coverage": 1.0,
                 "termination_reason": "gold_purchase",
             },
         },
@@ -125,7 +128,7 @@ def _write_jsonl(path, rows):
 
 
 class SftCollectionTests(unittest.TestCase):
-    def test_accepts_only_strict_reward_v3_gold_purchase(self):
+    def test_accepts_only_strict_reward_v4_gold_purchase(self):
         accepted, reasons = acceptance_reasons(_accepted_trajectory())
         self.assertTrue(accepted)
         self.assertEqual(reasons, [])
@@ -134,7 +137,13 @@ class SftCollectionTests(unittest.TestCase):
         invalid["terminal_result"]["reward_detail"]["reward_valid"] = False
         accepted, reasons = acceptance_reasons(invalid)
         self.assertFalse(accepted)
-        self.assertIn("reward_v3_invalid", reasons)
+        self.assertIn("reward_v4_invalid", reasons)
+
+        invalid = _accepted_trajectory()
+        invalid["terminal_result"]["reward_detail"]["sampling_invalid"] = True
+        accepted, reasons = acceptance_reasons(invalid)
+        self.assertFalse(accepted)
+        self.assertIn("sampling_invalid", reasons)
 
     def test_sft_row_removes_reasoning_and_terminal_reward(self):
         row = build_sft_row(_accepted_trajectory())

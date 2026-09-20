@@ -53,7 +53,7 @@ Rubric 只需要为每个任务生成一次；它不依赖某个 Actor 的轨迹
 > 物品，价格在20元左右。
 
 TaskFacts 还包含目标商品的 category、title、brand、pricing、attributes、
-customization options，以及 Reward v3 已编译的结构化需求。它们用于生成候选约束，
+customization options，以及 Reward v4 已编译并冻结的 requirement contract。它们用于生成候选约束，
 但目标商品私有字段不会进入 Actor，也不会直接进入 Pro Judge。
 
 Final-200 Clean 的约束如下：
@@ -61,7 +61,7 @@ Final-200 Clean 的约束如下：
 - 200 个任务；
 - 与 SFT、GRPO train/validation 和历史 benchmark 零重叠；
 - SHA-256：
-  `d99112a20ef47534c27a32e4b38229bf048dcc6b06fef2e3e919aac3093662f5`；
+  `345ee03df8be15a964f219677347fda7ccd9a10302f0896e04b0ee4e91ab13a1`；
 - 不用于 Prompt 调优、Rubric/Judge 校准或 checkpoint 选择；
 - 每个模型每题一次确定性 Rollout。
 
@@ -184,7 +184,7 @@ GRPO 共用同一份。
 
 | 设置 | 值 |
 |---|---|
-| Environment / Reward | v2.1 / Reward v3 |
+| Environment / Reward | v2.1 / Reward v4 |
 | 每题 Rollout | 1 |
 | Temperature / top-p | `0.0 / 1.0` |
 | 最大环境步数 | 35 |
@@ -247,7 +247,7 @@ Pro 明确看不到：
 
 - raw Observation；
 - Gold 商品私有字段和 Actor 未看到的候选；
-- Reward v3 分数、reward type、hard gates、weighted score；
+- Reward v4 分数、reward type、requirement verdicts、偏好分项与证据账本；
 - strict success、purchase success 或代码给出的成功结论；
 - infrastructure validity；
 - 其他模型在同一题上的结果。

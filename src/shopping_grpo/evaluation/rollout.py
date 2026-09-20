@@ -18,6 +18,9 @@ from uuid import uuid4
 from shopping_grpo.environment.actions import action_guard_tool_message, action_reject_reason
 from shopping_grpo.environment.context import (
     ContextBudgetError,
+    FallbackTokenCounter,
+    HeuristicChatTokenCounter,
+    HeuristicTextTokenCounter,
     VllmChatTokenCounter,
     VllmTextTokenCounter,
     compact_chat_messages,
@@ -82,7 +85,9 @@ class OpenAIChatClient:
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.responses_api = self.base_url.endswith("/responses")
+        self.chat_completions_api = self.base_url.endswith("/chat/completions")
         self.api_key = api_key
+        self.transport = transport
         self.temperature = float(temperature)
         self.top_p = float(top_p)
         self.timeout = timeout
@@ -103,31 +108,41 @@ class OpenAIChatClient:
         if self.context_window is not None:
             if self.context_window <= self.max_tokens + self.context_safety_margin:
                 raise ValueError("context_window must exceed max_tokens plus context_safety_margin")
-            self.token_counter = token_counter or VllmChatTokenCounter(
-                model=self.model,
-                base_url=self.base_url,
-                api_key=self.api_key,
-                timeout=self.timeout,
-            )
+            if token_counter is not None:
+                self.token_counter = token_counter
+            else:
+                self.token_counter = FallbackTokenCounter(
+                    VllmChatTokenCounter(
+                        model=self.model,
+                        base_url=self.base_url,
+                        api_key=self.api_key,
+                        timeout=self.timeout,
+                        transport=self.transport,
+                    ),
+                    HeuristicChatTokenCounter(),
+                )
         else:
             self.token_counter = token_counter
         if self.observation_token_budget is not None:
             if self.observation_token_budget < 64:
                 raise ValueError("observation_token_budget must be at least 64")
-            self.observation_token_counter = (
-                observation_token_counter
-                or VllmTextTokenCounter(
-                    model=self.model,
-                    base_url=self.base_url,
-                    api_key=self.api_key,
-                    timeout=self.timeout,
+            if observation_token_counter is not None:
+                self.observation_token_counter = observation_token_counter
+            else:
+                self.observation_token_counter = FallbackTokenCounter(
+                    VllmTextTokenCounter(
+                        model=self.model,
+                        base_url=self.base_url,
+                        api_key=self.api_key,
+                        timeout=self.timeout,
+                        transport=self.transport,
+                    ),
+                    HeuristicTextTokenCounter(),
                 )
-            )
         else:
             self.observation_token_counter = observation_token_counter
         self.last_context_event = None
         self.last_context_tokens = None
-        self.transport = transport
 
     def complete(self, messages, tools):
         """请求模型下一轮回复，并在上下文超限时按配置压缩历史。"""
@@ -190,7 +205,11 @@ class OpenAIChatClient:
             # 避免 Cloudflare 将 Python urllib 默认客户端识别为自动化流量。
             "User-Agent": "shopping-grpo-longhorizon/0.1",
         }
-        url = self.base_url if self.responses_api else f"{self.base_url}/chat/completions"
+        url = (
+            self.base_url
+            if self.responses_api or self.chat_completions_api
+            else f"{self.base_url}/chat/completions"
+        )
         for attempt in range(MODEL_COMPLETION_RETRIES + 1):
             try:
                 if self.transport is not None:

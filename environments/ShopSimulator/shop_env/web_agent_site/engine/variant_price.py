@@ -1,4 +1,4 @@
-"""Conservative option matching and variant-price resolution for Reward v3."""
+"""Conservative option matching and variant-price resolution for ShopSimulator."""
 
 from __future__ import annotations
 

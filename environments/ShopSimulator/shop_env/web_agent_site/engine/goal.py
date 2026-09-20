@@ -82,7 +82,7 @@ def get_existed_goals(all_products, product_prices, if_persona=False):
                 continue
 
             if product_prices is not None:
-                # Reward v3 must not invent an unstated budget from the Gold
+                # Reward v4 must not invent an unstated budget from the Gold
                 # product. Price availability remains a hard verifiability
                 # requirement, but an upper bound exists only when the user
                 # instruction states one.
@@ -121,7 +121,10 @@ def get_existed_goals(all_products, product_prices, if_persona=False):
                 'user_persona': user_persona,
                 'reason_key': reason_key,
             }
-            goal.update(compile_reward_features(product, item))
+            # Environment goals carry both legacy feature keys and a frozen
+            # Reward v4 contract.  The feature keys remain for old consumers;
+            # the v4 scorer only trusts the explicit contract.
+            goal.update(compile_reward_features(product, item, include_contract=True))
             goals.append(goal)
             for att in attributes:
                 cnt_atts[att] += 1

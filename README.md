@@ -51,7 +51,7 @@ Agent 不能只生成一句“推荐购买某商品”，而是必须真正与�
 
 ```mermaid
 flowchart LR
-    A[教师模型采集轨迹] --> B[Reward v3 回放过滤]
+    A[教师模型采集轨迹] --> B[Reward v4 合同与证据过滤]
     B --> C[Action-only SFT 数据]
     C --> D[LoRA SFT]
     D --> E[veRL 在线 GRPO]
@@ -64,31 +64,18 @@ flowchart LR
 
 | 阶段 | 目标 | 入口 | 详细文档 |
 |---|---|---|---|
-| Baseline | 测量原始 Qwen3.5-2B 的工具使用能力 | `bash scripts/baseline.sh` | [评估](docs/evaluation.md) |
-| SFT | 从高质量教师轨迹学习合法、完整的购物行为 | `bash scripts/sft.sh` | [SFT](docs/sft.md) |
-| GRPO | 在真实环境 Rollout 中优化 Reward v3 | `bash scripts/grpo.sh` | [GRPO](docs/grpo.md) |
-| Evaluation | 使用同一批 Final-200 Clean 留出任务公平比较模型 | `bash scripts/evaluate.sh NAME` | [评估](docs/evaluation.md) |
+| Baseline | 测量原始基座模型的工具使用能力 | `docs/reward-v4-workflow.md` 第 7–8 节 | [评估](docs/evaluation.md) |
+| SFT | 从高质量教师轨迹学习合法、完整的购物行为 | `docs/reward-v4-workflow.md` 第 4–5 节 | [SFT](docs/sft.md) |
+| GRPO | 在真实环境 Rollout 中优化 Reward v4 | `docs/reward-v4-workflow.md` 第 6 节 | [GRPO](docs/grpo.md) |
+| Evaluation | 使用互斥开发集和 Final-200 留出任务公平比较模型 | `docs/reward-v4-workflow.md` 第 7–8 节 | [评估](docs/evaluation.md) |
 
 ### SFT 数据是怎么收集的？
 
-当前数据使用 `deepseek-v4-flash` 作为教师模型，在 ShopSimulator
-Environment v2.1 中采集：
-
-- 共获得 2,498 条原始任务轨迹；
-- 每条轨迹在采集时都真实执行环境动作，再按 Reward v3 终局结果验收；
-- 其中 1,026 条通过严格验收，本次固定使用 1,000 条；
-- 最终划分为 800 条训练数据和 200 条验证数据，并与 GRPO、Final-200 Clean
-  保持 task_id 零重叠。
-
-仓库已提供可断点续跑的采集入口：
-
-```bash
-python scripts/collect_sft_data.py \
-  --tasks data/grpo/train.jsonl \
-  --output-dir outputs/sft-collection \
-  --target-accepted 1000 \
-  --workers 4
-```
+`data/sft/` 中提交的 800/200 轨迹是 Reward v3 历史产物，只用于复现旧结果，不能混入
+Reward v4 的新训练。Reward v4 重跑会先冻结互斥的 SFT、GRPO train/validation、开发集
+和 Final-200 任务池，再用指定教师 API 重新采集；只接受证据覆盖完整、合法且
+`strict_success=true` 的 v4 `gold_purchase`。可断点续跑的完整命令见
+[Reward v4 完整重跑手册](docs/reward-v4-workflow.md)。
 
 SFT 只在 Assistant 动作 token 上计算 Loss，用户指令和环境 Observation 会被
 Mask。这样模型学习的是可执行的工具策略，而不是背诵环境返回内容。数据哈希、接受率
@@ -97,7 +84,7 @@ Mask。这样模型学习的是可执行的工具策略，而不是背诵环境�
 ### GRPO 是怎么训练的？
 
 GRPO 从合并后的 SFT 模型开始。veRL 在 ShopSimulator 中为每个 Prompt 在线生成
-四条轨迹，环境用确定性的 Reward v3 评估最终购买结果、约束满足程度和终止行为。
+四条轨迹，环境用确定性的 Reward v4 评估最终购买结果、约束满足程度、证据覆盖和终止行为。
 训练不使用额外的 LLM-as-a-Judge Reward Model。
 
 本仓库没有复制 veRL 源码，而是固定安装 `verl==0.8.0`，并保留项目自己的
@@ -224,6 +211,10 @@ SFT 带来了主要能力提升，让模型学会合法工具调用、长程搜�
 
 以下命令都在仓库根目录执行。
 
+> Reward v4 的新实验必须使用[完整重跑手册](docs/reward-v4-workflow.md)：它会先创建
+> 互斥任务池并重新采集数据。下面的历史快捷脚本仍保留用于复现旧目录结构，不能把
+> `data/sft/`、`data/grpo/` 或旧输出混入本次 v4 运行。
+
 ### 1. 安装
 
 ```bash
@@ -314,21 +305,18 @@ bash scripts/report_all.sh
 
 Checkpoint、Rollout 和日志统一写入 Git 忽略的 `outputs/`。
 
-## Reward v3 简介
+## Reward v4 简介
 
-Reward v3 是一个确定性的终局 Reward，不依赖另一个大模型进行主观判断：
+Reward v4 是一个基于冻结需求合同、最终订单事实和 Actor 可见证据的确定性终局 Reward：
 
-- 类别和预算是 Hard Gate；
-- 品牌、型号、核心功能、关键规格按照 `0.35 / 0.25 / 0.25 / 0.15` 加权；
-- 完全满足并命中目标商品得到 `1.0`；
-- 完全满足的替代商品得到 `0.55`；
-- 部分满足按照连续分数计算，最高 `0.25`；
-- 错误购买、过早放弃、重复循环和达到最大步数都会获得不同负奖励；
-- 证据不足时标记为 `reward_valid=false`，不会伪装成有效的零分样本。
+- 必须条件与可妥协偏好分开，必须条件失败不能被低价、偏好或 Gold ASIN 抵消；
+- 合格购买效用为完成、偏好、价格目标、Gold 对齐和有限操作浪费成本的确定组合；
+- 错误购买按冻结严重度规则评分，未核验购买与基础设施不可评分严格分离；
+- `gold_purchase` 必须是完整合法终局、关键证据完整且 `reward_valid=true`；
+- SFT、GRPO、开发集与 Final-200 同时按 task ID 和规范化需求文本隔离。
 
-![Reward V3 decision rules](docs/images/reward-v3-decision-rules.png)
-
-完整公式、终止条件和证据要求见 [Reward v3 设计文档](docs/reward-v3.md)。
+完整规则见 [Reward v4 设计](docs/reward-v4-design.md)，从数据重建到评测的命令见
+[Reward v4 完整重跑手册](docs/reward-v4-workflow.md)。
 
 ## 仓库结构
 
@@ -388,7 +376,9 @@ bash scripts/grpo.sh --logger swanlab
 - [留出集评估](docs/evaluation.md)
 - [Final-200 Clean 测试集说明](docs/evaluation-dataset.md)
 - [Final-200 Benchmark Dashboard（历史）](docs/evaluation-dashboard.html)
-- [Reward v3 设计](docs/reward-v3.md)
+- [Reward v4 设计](docs/reward-v4-design.md)
+- [Reward v4 完整重跑手册](docs/reward-v4-workflow.md)
+- [Reward v3 历史说明](docs/reward-v3.md)
 - [可审计实验结果](experiments/comparison.md)
 
 ## 后续改进计划

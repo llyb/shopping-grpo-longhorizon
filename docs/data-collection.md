@@ -9,7 +9,7 @@ trajectories, not historical failed collection attempts.
 
 ## How the dataset was produced
 
-The current collection used ShopSimulator Environment v2.1, Reward v3 and
+The committed historical collection used ShopSimulator Environment v2.1, Reward v3 and
 `deepseek-v4-flash` as the teacher. It produced 2,498 raw trajectories.
 Every trajectory executed its actions in ShopSimulator during collection. The
 saved result was accepted only when Environment v2.1 returned a valid Reward v3
@@ -41,6 +41,10 @@ is retained in `data/sft/metadata.json` as provenance.
 
 ## Run a new collection
 
+New collections use Reward v4 and must start from task/content-disjoint pools.
+Follow [`reward-v4-workflow.md`](reward-v4-workflow.md); the abbreviated command
+below is retained only to explain the collector interface.
+
 Start ShopSimulator, configure an OpenAI-compatible Teacher endpoint, and run:
 
 ```bash
@@ -61,7 +65,7 @@ skips completed task attempts and rebuilds all derived files:
 ```text
 outputs/sft-collection/
   raw.jsonl           complete Teacher responses and environment results
-  accepted.jsonl      strict Reward v3 gold trajectories
+  accepted.jsonl      strict Reward v4 gold trajectories
   rejected.jsonl      task IDs and deterministic rejection reasons
   reject_stats.json   aggregate acceptance audit
   sft.jsonl           sanitized training rows before splitting
@@ -93,7 +97,7 @@ Each JSONL row is a chat trajectory with:
 - assistant tool calls;
 - ShopSimulator tool observations;
 - the final terminal action;
-- metadata tying the row to Environment v2.1 and Reward v3.
+- metadata tying the row to Environment v2.1 and Reward v4.
 
 During SFT, user and tool tokens are masked. Loss is computed only on assistant
 actions. See [SFT](sft.md) for the exact training recipe.

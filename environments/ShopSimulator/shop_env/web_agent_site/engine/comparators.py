@@ -1,4 +1,4 @@
-"""Field-aware, tri-state comparators for ShopSimulator Reward v3."""
+"""Field-aware, tri-state comparators shared by ShopSimulator rewards."""
 
 from __future__ import annotations
 

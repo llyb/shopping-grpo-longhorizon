@@ -7,7 +7,7 @@ ShopSimulator 的按钮和商品只在当前页面有效。动作守卫在请求
 import json
 import re
 
-from shopping_grpo.environment.product_id import PRODUCT_ID_CAPTURE
+from shopping_grpo.environment.product_id import PRODUCT_ID_CAPTURE, is_product_id
 from shopping_grpo.environment.tools import SHOP_TOOL_SCHEMAS, tool_call_to_action
 
 
@@ -112,14 +112,19 @@ def action_guard_tool_message(tool_call, reason, observation):
 
 def product_ids(observation):
     """提取当前 observation 中可打开的商品 ID，并保持出现顺序。"""
-    return list(
-        dict.fromkeys(
-            re.findall(
-                rf"(?m)^\d+\|({PRODUCT_ID_CAPTURE})\|",
-                observation,
-            )
-        )
+    structured = re.findall(
+        rf"(?m)^\d+\|({PRODUCT_ID_CAPTURE})\|",
+        str(observation),
     )
+    # Compatibility for the legacy ShopSimulator text renderer.  Only exact
+    # separator-delimited IDs are accepted, so prices and free text cannot
+    # become action targets.
+    legacy = [
+        part.strip()
+        for part in re.split(r"\s*\[SEP\]\s*", str(observation))
+        if is_product_id(part.strip())
+    ]
+    return list(dict.fromkeys([*structured, *legacy]))
 
 
 def clickable_buttons(observation):

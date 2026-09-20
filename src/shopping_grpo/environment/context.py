@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+from http.client import RemoteDisconnected
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
@@ -153,6 +155,8 @@ class VllmChatTokenCounter:
     def __init__(self, model, base_url, api_key, timeout=60, transport=None):
         self.model = model
         base_url = base_url.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[: -len("/chat/completions")]
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
         self.url = f"{base_url}/tokenize"
@@ -195,6 +199,8 @@ class VllmTextTokenCounter:
     def __init__(self, model, base_url, api_key, timeout=60, transport=None):
         self.model = model
         base_url = base_url.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[: -len("/chat/completions")]
         if base_url.endswith("/v1"):
             base_url = base_url[:-3]
         self.url = f"{base_url}/tokenize"
@@ -224,6 +230,58 @@ class VllmTextTokenCounter:
         if not isinstance(count, int) or count < 0:
             raise ValueError("vLLM /tokenize response is missing a non-negative integer count")
         return count
+
+
+class HeuristicChatTokenCounter:
+    """Conservative local estimate for OpenAI-compatible APIs without ``/tokenize``.
+
+    The collection API supplied by users may expose only chat completions and
+    not vLLM's tokenizer endpoint.  Counting serialized Unicode characters is
+    intentionally conservative for this project's Chinese/ASCII prompts: it
+    may compact a little earlier than the model tokenizer, but it never
+    requires a provider-specific endpoint or downloads a tokenizer.
+    """
+
+    def __call__(self, messages, tools):
+        payload = {
+            "messages": messages,
+            "tools": tools,
+            "add_generation_prompt": True,
+        }
+        return max(1, len(json.dumps(payload, ensure_ascii=False, separators=(",", ":"))))
+
+
+class HeuristicTextTokenCounter:
+    """Conservative local character-count estimate for plain observations."""
+
+    def __call__(self, text):
+        return max(1, len(str(text)))
+
+
+class FallbackTokenCounter:
+    """Use a serving tokenizer when available, then fail over once locally.
+
+    A missing or incompatible ``/tokenize`` endpoint must not make a chat-only
+    teacher API unusable.  The fallback is sticky so a rollout does not issue a
+    failing probe on every turn.  Malformed provider responses are included in
+    the fallback set because they have the same operational meaning here.
+    """
+
+    def __init__(self, primary, fallback):
+        self.primary = primary
+        self.fallback = fallback
+        self.fallback_active = False
+        self.fallback_error = None
+
+    def __call__(self, *args, **kwargs):
+        if self.fallback_active:
+            return self.fallback(*args, **kwargs)
+        try:
+            return self.primary(*args, **kwargs)
+        except (OSError, RemoteDisconnected, URLError, TimeoutError, ValueError) as exc:
+            self.fallback_active = True
+            self.fallback_error = f"{exc.__class__.__name__}: {exc}"
+            return self.fallback(*args, **kwargs)
 
 
 def _split_chat_tool_groups(messages):

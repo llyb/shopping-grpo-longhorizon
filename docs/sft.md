@@ -10,16 +10,21 @@ variants and terminate.
 ## Inputs
 
 - Base model: `Qwen/Qwen3.5-2B`
-- Main data: `data/sft_pure_v4/all.jsonl` (1,192 rows)
-- Fixed curriculum manifest: `data/sft_curriculum/manifest.json`
-- Gradient rows: 1,073; development rows: 119; Final evaluation overlap: 0
+- A new run must use the task-disjoint collection produced by
+  [`reward-v4-workflow.md`](reward-v4-workflow.md), not a checked-in dataset.
+- The checked-in `data/sft_pure_v4/` curriculum is a historical Reward v4
+  artifact and is retained for provenance only.
 - Target: assistant tokens only; user and tool-observation tokens are masked
 
-The source and label hashes, exact task IDs, stage definitions, and review-only
-flags are frozen in the curriculum manifest. The older `data/sft/` split is
-kept only for reproducing the historical baseline.
+The new collection records source and label hashes, exact task IDs and the
+acceptance audit in its run directory. The older `data/sft/` split is kept only
+for reproducing historical baselines.
 
 ## Run
+
+For the complete fresh SFT collection, split, training and evaluation sequence,
+use [`reward-v4-workflow.md`](reward-v4-workflow.md). The historical curriculum
+launcher below must not be mixed into that run.
 
 After `bash scripts/setup.sh`:
 

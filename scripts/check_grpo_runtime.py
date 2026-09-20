@@ -26,10 +26,19 @@ PATCH_MARKER = "SHOPPING_GRPO_DYNAMIC_SAMPLING_PATCH_V3"
 MAX_SAFE_RESPONSE_LENGTH = 20480
 MAX_SAFE_SEQUENCE_LENGTH = 24576
 CURRENT_RUNTIME_FILES = {
+    "comparators.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/comparators.py",
+    "config.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/config.py",
+    "constraints.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/constraints.py",
+    "evidence.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/evidence.py",
+    "goal.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/goal.py",
     "observation.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/observation.py",
     "pack_api.py": "environments/ShopSimulator/shop_env/shop_env/pack_api.py",
     "reward.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/reward.py",
+    "reward_features.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/reward_features.py",
+    "reward_v4.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/reward_v4.py",
     "slot_lease_pool.py": "environments/ShopSimulator/shop_env/shop_env/slot_lease_pool.py",
+    "termination.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/termination.py",
+    "variant_price.py": "environments/ShopSimulator/shop_env/web_agent_site/engine/variant_price.py",
     "web_agent_text_env.py": "environments/ShopSimulator/shop_env/web_agent_site/envs/web_agent_text_env.py",
 }
 
@@ -287,21 +296,21 @@ def validate_swanlab_tracking(config):
     forbidden = {"wandb", "tracking", "vemlp_wandb"} & set(logger_backends)
     if forbidden:
         raise SystemExit(
-            "Reward v3 GRPO forbids W&B logger backends: "
+            "Reward v4 GRPO forbids W&B logger backends: "
             + ", ".join(sorted(forbidden))
         )
     if os.environ.get("SWANLAB_MODE") != "online":
-        raise SystemExit("Reward v3 GRPO requires SWANLAB_MODE=online")
+        raise SystemExit("Reward v4 GRPO requires SWANLAB_MODE=online")
     if not os.environ.get("SWANLAB_API_KEY"):
         raise SystemExit(
-            "Reward v3 GRPO requires SWANLAB_API_KEY in the launching environment"
+            "Reward v4 GRPO requires SWANLAB_API_KEY in the launching environment"
         )
     log_dir = os.environ.get("SWANLAB_LOG_DIR")
     if not log_dir:
-        raise SystemExit("Reward v3 GRPO requires SWANLAB_LOG_DIR")
+        raise SystemExit("Reward v4 GRPO requires SWANLAB_LOG_DIR")
     resolved_log_dir = Path(log_dir).resolve()
     if str(config.trainer.get("project_name")) != "shopping-grpo":
-        raise SystemExit("Reward v3 GRPO SwanLab project must be shopping-grpo")
+        raise SystemExit("Reward v4 GRPO SwanLab project must be shopping-grpo")
     print(
         "SwanLab online preflight passed: "
         + json.dumps(

@@ -133,7 +133,13 @@ def aggregate_shopping_metrics(shopping_infos: Sequence[object]) -> dict[str, fl
             float(reward.get("evidence_coverage", 0.0))
         )
         partial_purchase.append(
-            float(info.get("reward_type") == "partial_alternative_purchase")
+            float(
+                info.get("reward_type")
+                in {
+                    "partial_alternative_purchase",
+                    "acceptable_compromise_purchase",
+                }
+            )
         )
 
     def mean(values):

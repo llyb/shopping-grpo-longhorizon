@@ -27,8 +27,13 @@ TOOL_LABELS = {
 }
 REWARD_LABELS = {
     "gold_purchase": "严格成功购买",
-    "partial_alternative_purchase": "部分满足购买",
+    "valid_alternative_purchase": "完全满足的替代商品",
+    "acceptable_compromise_purchase": "授权范围内妥协购买",
     "wrong_purchase": "错误购买",
+    "unverified_purchase": "证据不完整购买",
+    "reward_unverifiable": "奖励不可核验",
+    "stop_with_acceptable_candidate": "发现可接受候选后停止",
+    "graceful_stop": "有依据停止",
     "repeat_loop": "重复循环",
     "max_steps": "达到步数上限",
     "early_abstain": "过早放弃",
@@ -114,8 +119,13 @@ def build_data(run_dir):
     charts = {
         "outcomes": [
             {"key": "gold_purchase", "label": "严格成功购买", "value": reward_counts["gold_purchase"]},
-            {"key": "partial_alternative_purchase", "label": "部分满足购买", "value": reward_counts["partial_alternative_purchase"]},
+            {"key": "valid_alternative_purchase", "label": "完全满足的替代商品", "value": reward_counts["valid_alternative_purchase"]},
+            {"key": "acceptable_compromise_purchase", "label": "授权范围内妥协购买", "value": reward_counts["acceptable_compromise_purchase"]},
             {"key": "wrong_purchase", "label": "错误购买", "value": reward_counts["wrong_purchase"]},
+            {"key": "unverified_purchase", "label": "证据不完整购买", "value": reward_counts["unverified_purchase"]},
+            {"key": "reward_unverifiable", "label": "奖励不可核验", "value": reward_counts["reward_unverifiable"]},
+            {"key": "stop_with_acceptable_candidate", "label": "发现可接受候选后停止", "value": reward_counts["stop_with_acceptable_candidate"]},
+            {"key": "graceful_stop", "label": "有依据停止", "value": reward_counts["graceful_stop"]},
             {"key": "repeat_loop", "label": "重复循环", "value": reward_counts["repeat_loop"]},
             {"key": "max_steps", "label": "达到步数上限", "value": reward_counts["max_steps"]},
             {"key": "early_abstain", "label": "过早放弃", "value": reward_counts["early_abstain"]},
@@ -245,7 +255,7 @@ HTML = r'''<!doctype html>
   </section>
 
   <section class="grid two">
-    <div class="card"><h2>最终结果构成</h2><div id="outcome-chart"></div><div class="small">严格成功以 Reward v3 的 gold_purchase 计；未完成表示模型停止时没有终局 Reward。</div></div>
+    <div class="card"><h2>最终结果构成</h2><div id="outcome-chart"></div><div class="small">严格成功以 Reward v4 的合法且有效 gold_purchase 计；未完成表示模型停止时没有终局 Reward。</div></div>
     <div class="card"><h2>步数区间与严格成功</h2><div id="step-chart"></div><div class="small">每个柱同时显示该区间任务量和严格成功率。</div></div>
   </section>
 
@@ -261,7 +271,7 @@ HTML = r'''<!doctype html>
 
   <section class="card" style="margin-top:16px">
     <h2>任务明细</h2>
-    <div class="controls"><input id="query-filter" placeholder="搜索 task_id 或用户需求"><select id="outcome-filter"><option value="all">全部结果</option><option value="gold_purchase">严格成功购买</option><option value="partial_alternative_purchase">部分满足购买</option><option value="wrong_purchase">错误购买</option><option value="repeat_loop">重复循环</option><option value="max_steps">达到步数上限</option><option value="early_abstain">过早放弃</option><option value="unknown">未完成 / 无终局</option></select><span class="small" id="row-count"></span></div>
+    <div class="controls"><input id="query-filter" placeholder="搜索 task_id 或用户需求"><select id="outcome-filter"><option value="all">全部结果</option><option value="gold_purchase">严格成功购买</option><option value="valid_alternative_purchase">完全满足的替代商品</option><option value="acceptable_compromise_purchase">授权范围内妥协购买</option><option value="wrong_purchase">错误购买</option><option value="unverified_purchase">证据不完整购买</option><option value="reward_unverifiable">奖励不可核验</option><option value="stop_with_acceptable_candidate">发现可接受候选后停止</option><option value="graceful_stop">有依据停止</option><option value="repeat_loop">重复循环</option><option value="max_steps">达到步数上限</option><option value="early_abstain">过早放弃</option><option value="unknown">未完成 / 无终局</option></select><span class="small" id="row-count"></span></div>
     <div class="table-wrap"><table><thead><tr><th><button data-sort="task_id">Task ID ↕</button></th><th>用户需求</th><th><button data-sort="reward_type">结果 ↕</button></th><th class="num"><button data-sort="steps">步数 ↕</button></th><th class="num"><button data-sort="reward">Reward ↕</button></th><th class="num"><button data-sort="guard_count">Guard ↕</button></th><th>动作序列</th></tr></thead><tbody id="task-table"></tbody></table></div>
   </section>
   <footer id="report-footer"></footer>
@@ -274,9 +284,9 @@ const fmtPct = v => `${(Number(v) * 100).toFixed(1)}%`;
 const fmt = v => Number(v).toFixed(3);
 const esc = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
 const show = value => value === '' || value === null || value === undefined ? '—' : value;
-const outcomeLabel = key => ({gold_purchase:'严格成功购买',partial_alternative_purchase:'部分满足购买',wrong_purchase:'错误购买',repeat_loop:'重复循环',max_steps:'达到步数上限',early_abstain:'过早放弃',unknown:'未完成 / 无终局'})[key] || key;
-const outcomeClass = key => key === 'gold_purchase' ? 'ok' : ['wrong_purchase','repeat_loop','max_steps','early_abstain'].includes(key) ? 'bad' : key === 'partial_alternative_purchase' ? 'warn' : 'neutral';
-const barClass = key => ({gold_purchase:'green',partial_alternative_purchase:'amber',wrong_purchase:'red',repeat_loop:'red',max_steps:'purple',early_abstain:'red',unknown:'cyan'})[key] || '';
+const outcomeLabel = key => ({gold_purchase:'严格成功购买',valid_alternative_purchase:'完全满足的替代商品',acceptable_compromise_purchase:'授权范围内妥协购买',wrong_purchase:'错误购买',unverified_purchase:'证据不完整购买',reward_unverifiable:'奖励不可核验',stop_with_acceptable_candidate:'发现可接受候选后停止',graceful_stop:'有依据停止',repeat_loop:'重复循环',max_steps:'达到步数上限',early_abstain:'过早放弃',unknown:'未完成 / 无终局'})[key] || key;
+const outcomeClass = key => ['gold_purchase','valid_alternative_purchase'].includes(key) ? 'ok' : ['wrong_purchase','unverified_purchase','repeat_loop','max_steps','early_abstain','stop_with_acceptable_candidate'].includes(key) ? 'bad' : key === 'acceptable_compromise_purchase' ? 'warn' : 'neutral';
+const barClass = key => ({gold_purchase:'green',valid_alternative_purchase:'green',acceptable_compromise_purchase:'amber',wrong_purchase:'red',unverified_purchase:'red',reward_unverifiable:'amber',stop_with_acceptable_candidate:'red',graceful_stop:'cyan',repeat_loop:'red',max_steps:'purple',early_abstain:'red',unknown:'cyan'})[key] || '';
 function setText(id, value) { document.getElementById(id).textContent = value; }
 setText('report-tag', `Shopping GRPO · ${M.reward_contract || '评测报告'}`);
 setText('report-title', `${M.model} 评测报告`);

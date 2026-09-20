@@ -4,6 +4,9 @@ import unittest
 
 from shopping_grpo.environment.context import (
     ContextBudgetError,
+    FallbackTokenCounter,
+    HeuristicChatTokenCounter,
+    HeuristicTextTokenCounter,
     VllmChatTokenCounter,
     compact_chat_messages,
     compact_token_trajectory,
@@ -109,6 +112,43 @@ class ChatContextWindowTest(unittest.TestCase):
         self.assertEqual(captured["url"], "http://127.0.0.1:8000/tokenize")
         self.assertEqual(captured["payload"]["model"], "shopping")
         self.assertTrue(captured["payload"]["add_generation_prompt"])
+
+    def test_vllm_counter_normalizes_full_chat_completions_endpoint(self):
+        captured = {}
+
+        def transport(url, payload, headers, timeout):
+            captured["url"] = url
+            return {"count": 3}
+
+        counter = VllmChatTokenCounter(
+            model="shopping",
+            base_url="http://127.0.0.1:3010/v1/chat/completions",
+            api_key="EMPTY",
+            transport=transport,
+        )
+
+        self.assertEqual(counter([], []), 3)
+        self.assertEqual(captured["url"], "http://127.0.0.1:3010/tokenize")
+
+    def test_chat_only_provider_can_fall_back_without_tokenize_endpoint(self):
+        calls = []
+
+        def unavailable(*args, **kwargs):
+            calls.append(1)
+            raise ValueError("404 /tokenize")
+
+        counter = FallbackTokenCounter(unavailable, HeuristicChatTokenCounter())
+        first = counter([{"role": "user", "content": "任务"}], [])
+        second = counter([{"role": "user", "content": "任务"}], [])
+
+        self.assertGreater(first, 0)
+        self.assertEqual(first, second)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(counter.fallback_active)
+
+    def test_text_fallback_counts_unicode_without_provider_tokenizer(self):
+        counter = HeuristicTextTokenCounter()
+        self.assertEqual(counter("白色手机"), 4)
 
 
 class TokenTrajectoryWindowTest(unittest.TestCase):

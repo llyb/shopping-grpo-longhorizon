@@ -69,9 +69,9 @@ def validate_manifest(manifest):
     )
     if environment_version != "shopsimulator-environment-v2.1":
         raise ValueError("manifest has an unsupported environment_version")
-    if manifest["reward"].get("version") != "shopsimulator-reward-v3":
+    if manifest["reward"].get("version") != "shopsimulator-reward-v4":
         raise ValueError(
-            "shopsimulator-environment-v2.1 requires shopsimulator-reward-v3"
+            "shopsimulator-environment-v2.1 requires shopsimulator-reward-v4"
         )
     if manifest["search"].get("version") != "shopsimulator-multifield-bm25-v2":
         raise ValueError("manifest does not select multi-field BM25 v2")

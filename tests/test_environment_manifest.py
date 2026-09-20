@@ -21,7 +21,7 @@ class EnvironmentManifestTest(unittest.TestCase):
                 "version": "shopsimulator-multifield-bm25-v2",
                 "page_size": 20,
             },
-            "reward": {"version": "shopsimulator-reward-v3"},
+            "reward": {"version": "shopsimulator-reward-v4"},
             "observation_version": "shopping-observation-v2",
             "tool_version": "shopping-tools-v2",
             "max_steps": 35,
@@ -33,7 +33,7 @@ class EnvironmentManifestTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing"):
             validate_manifest({})
 
-    def test_current_environment_requires_reward_v3(self):
+    def test_current_environment_requires_reward_v4(self):
         manifest = {
             "manifest_version": MANIFEST_VERSION,
             "environment_version": "shopsimulator-environment-v2.1",
@@ -43,7 +43,7 @@ class EnvironmentManifestTest(unittest.TestCase):
                 "version": "shopsimulator-multifield-bm25-v2",
                 "page_size": 20,
             },
-            "reward": {"version": "shopsimulator-reward-v3"},
+            "reward": {"version": "shopsimulator-reward-v4"},
             "observation_version": "shopping-observation-v2",
             "tool_version": "shopping-tools-v2",
             "max_steps": 35,
@@ -51,7 +51,7 @@ class EnvironmentManifestTest(unittest.TestCase):
         }
         self.assertIs(validate_manifest(manifest), manifest)
         manifest["reward"] = {"version": "unsupported-reward"}
-        with self.assertRaisesRegex(ValueError, "requires shopsimulator-reward-v3"):
+        with self.assertRaisesRegex(ValueError, "requires shopsimulator-reward-v4"):
             validate_manifest(manifest)
 
     def test_wrong_tool_contract_is_rejected(self):
@@ -63,7 +63,7 @@ class EnvironmentManifestTest(unittest.TestCase):
                 "version": "shopsimulator-multifield-bm25-v2",
                 "page_size": 20,
             },
-            "reward": {"version": "shopsimulator-reward-v3"},
+            "reward": {"version": "shopsimulator-reward-v4"},
             "observation_version": "shopping-observation-v2",
             "tool_version": "unsupported-tools",
             "max_steps": 35,

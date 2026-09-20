@@ -3,7 +3,7 @@
 ## Purpose
 
 SFT teaches the action format and a strong initial policy. GRPO then samples
-fresh trajectories in ShopSimulator and optimizes the terminal Reward v3 signal.
+fresh trajectories in ShopSimulator and optimizes the terminal Reward v4 signal.
 The goal is to improve constraint satisfaction and termination behavior without
 requiring a learned reward model.
 
@@ -26,10 +26,15 @@ unknown veRL version.
 ## Inputs
 
 - Initial policy: `outputs/models/sft-merged`
-- Train set: `data/grpo/train.parquet` (1,000 tasks)
-- Validation set: `data/grpo/validation.parquet` (50 tasks)
+- New run: parquet is rebuilt from the isolated `outputs/reward-v4-*/splits`
+  pools by [`reward-v4-workflow.md`](reward-v4-workflow.md).
+- The checked-in train/validation parquet (1,000/50) is a historical artifact
+  and must not be mixed with a new Reward v4 run.
 - Environment: ShopSimulator Environment v2.1
-- Reward: Reward v3
+- Reward: Reward v4
+
+For rebuilding leak-free task pools and parquet files, use the commands in
+[`reward-v4-workflow.md`](reward-v4-workflow.md).
 
 Hashes are recorded in [`data/grpo/metadata.json`](../data/grpo/metadata.json).
 

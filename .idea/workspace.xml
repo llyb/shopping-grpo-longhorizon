@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="c31d9717-fc35-4958-9644-7d7a1c923c2b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/AGENTS.md" beforeDir="false" afterPath="$PROJECT_DIR$/AGENTS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.en.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.en.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/environment.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/environment.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/evaluation/metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/evaluation/metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/data-collection.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/data-collection.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/evaluation-dataset.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/evaluation-dataset.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/evaluation.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/evaluation.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/grpo.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/grpo.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/sft.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/sft.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/configs/environment.json" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/configs/environment.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/tests/test_config.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/tests/test_config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/comparators.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/comparators.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/goal.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/goal.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/reward.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/reward.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/reward_features.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/reward_features.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/termination.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/termination.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/variant_price.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/engine/variant_price.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/envs/web_agent_text_env.py" beforeDir="false" afterPath="$PROJECT_DIR$/environments/ShopSimulator/shop_env/web_agent_site/envs/web_agent_text_env.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/build_comparison_report.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/build_comparison_report.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/build_glm_report.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/build_glm_report.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/check_grpo_runtime.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/check_grpo_runtime.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/evaluate_shop_benchmark.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/evaluate_shop_benchmark.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/run_sft_curriculum.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/run_sft_curriculum.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/train_grpo.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/train_grpo.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/collection/sft.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/collection/sft.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/environment/actions.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/environment/actions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/environment/context.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/environment/context.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/environment/manifest.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/environment/manifest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/environment/projection.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/environment/projection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/evaluation/blind_guard.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/evaluation/blind_guard.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/evaluation/metrics.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/evaluation/metrics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/evaluation/rollout.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/evaluation/rollout.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/evaluation/summary.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/evaluation/summary.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/resources/blind_guard.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/resources/blind_guard.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/smoke.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/smoke.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/adapter/runtime.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/adapter/runtime.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/adapter/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/adapter/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/dynamic_sampling.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/training/grpo/dynamic_sampling.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_benchmark.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_benchmark.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_context_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_context_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_environment_manifest.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_environment_manifest.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_evaluation_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_evaluation_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_observation_projection.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_observation_projection.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/test_sft_collection.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_sft_collection.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="3JGJQb32K5TtIHcWtygazzGOy8F" />
+  <component name="ProjectViewState">
+    <option name="autoscrollFromSource" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;F:/shopping-grpo-longhorizon&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="c31d9717-fc35-4958-9644-7d7a1c923c2b" name="Changes" comment="" />
+      <created>1789281456931</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1789281456931</updated>
+      <workItem from="1789281458013" duration="2805000" />
+      <workItem from="1789375760654" duration="35000" />
+      <workItem from="1789435746331" duration="4810000" />
+      <workItem from="1789565056047" duration="1956000" />
+      <workItem from="1789609951258" duration="9566000" />
+      <workItem from="1789696985046" duration="1234000" />
+      <workItem from="1789869455438" duration="1740000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

@@ -47,18 +47,18 @@ does not depend on a separately running third-party repository.
 
 | Stage | What happens | Entry point | Details |
 |---|---|---|---|
-| Baseline | Evaluate the untouched base model | `bash scripts/baseline.sh` | [Evaluation](docs/evaluation.md) |
-| SFT | Learn tool use from accepted teacher trajectories | `bash scripts/sft.sh` | [SFT](docs/sft.md) |
-| GRPO | Optimize terminal Reward v3 with online rollouts | `bash scripts/grpo.sh` | [GRPO](docs/grpo.md) |
-| Evaluation | Run the curated Final-200 Clean protocol | `bash scripts/evaluate.sh NAME` | [Evaluation](docs/evaluation.md) |
+| Baseline | Evaluate the untouched base model | [Reward v4 workflow](docs/reward-v4-workflow.md), sections 7–8 | [Evaluation](docs/evaluation.md) |
+| SFT | Learn tool use from accepted teacher trajectories | [Reward v4 workflow](docs/reward-v4-workflow.md), sections 4–5 | [SFT](docs/sft.md) |
+| GRPO | Optimize terminal Reward v4 with online rollouts | [Reward v4 workflow](docs/reward-v4-workflow.md), section 6 | [GRPO](docs/grpo.md) |
+| Evaluation | Compare models on disjoint development and Final-200 pools | [Reward v4 workflow](docs/reward-v4-workflow.md), sections 7–8 | [Evaluation](docs/evaluation.md) |
 
 The checked-in SFT data was produced by a separate collection stage documented
 in [Data collection](docs/data-collection.md). The custom constraint-aware
-reward is specified in [Reward v3](docs/reward-v3.md).
+reward is specified in [Reward v4](docs/reward-v4-design.md).
 
 ```mermaid
 flowchart LR
-    A[Teacher rollouts] --> B[Reward v3 filtering]
+    A[Teacher rollouts] --> B[Reward v4 contract and evidence filtering]
     B --> C[Action-only SFT data]
     C --> D[LoRA SFT]
     D --> E[Online GRPO with veRL]
@@ -71,27 +71,17 @@ flowchart LR
 
 ### How the SFT data was collected
 
-The current collection used `deepseek-v4-flash` as a teacher in ShopSimulator
-Environment v2.1. It produced 2,498 raw trajectories, of which 1,026 passed the
-strict acceptance filter. This frozen revision uses 1,000 trajectories split
-into 800 training and 200 validation rows. SFT, GRPO and Final-200 Clean task IDs are
-pairwise disjoint. Dataset hashes and the audit are in
-[Data collection](docs/data-collection.md).
-
-The resumable collection entry point is:
-
-```bash
-python scripts/collect_sft_data.py \
-  --tasks data/grpo/train.jsonl \
-  --output-dir outputs/sft-collection \
-  --target-accepted 1000 \
-  --workers 4
-```
+The checked-in 800/200 trajectories under `data/sft/` are historical Reward v3
+artifacts and must not be mixed into a Reward v4 run. The v4 workflow first
+freezes mutually disjoint SFT, GRPO train/validation, development and Final-200
+pools, then recollects teacher trajectories. It accepts only legal v4
+`gold_purchase` terminals with complete evidence and `strict_success=true`.
+See the [Reward v4 workflow](docs/reward-v4-workflow.md) for the resumable commands.
 
 ### How GRPO is trained
 
 GRPO starts from the merged SFT model. veRL generates four online trajectories
-per prompt in ShopSimulator, while deterministic Reward v3 scores the terminal
+per prompt in ShopSimulator, while deterministic Reward v4 scores the terminal
 purchase, constraint satisfaction and termination behavior. No additional
 LLM-as-a-Judge reward model is used for training.
 
@@ -212,6 +202,11 @@ the Shopping Agent adapter and a small version-checked patch live here.
 
 Run every command from the repository root.
 
+> New Reward v4 experiments must follow the [complete rerun workflow](docs/reward-v4-workflow.md),
+> which freezes disjoint task pools before collecting data. The historical shortcut scripts below
+> remain for old directory layouts; do not mix their checked-in `data/sft/`, `data/grpo/`, or old
+> outputs into a v4 run.
+
 ### 1. Install
 
 ```bash
@@ -290,26 +285,24 @@ bash scripts/evaluate.sh grpo
 Generated checkpoints, rollouts and logs are written under `outputs/`, which is
 ignored by Git.
 
-## Reward V3 overview
+## Reward V4 overview
 
-Reward v3 is a deterministic terminal reward; it does not rely on another
-language model for subjective judgment:
+Reward v4 is a deterministic terminal reward based on a frozen requirement
+contract, final-order facts and evidence actually shown to the actor:
 
-- category and budget are hard gates;
-- brand, model, core functions and key options use weights of
-  `0.35 / 0.25 / 0.25 / 0.15`;
-- an exact target purchase with full satisfaction receives `1.0`;
-- a fully satisfying alternative item receives `0.55`;
-- partial satisfaction receives a continuous score capped at `0.25`;
-- wrong purchases, premature abstention, repeat loops and maximum-step
-  termination receive distinct negative rewards;
-- insufficient evidence sets `reward_valid=false`, rather than being treated as
-  a valid neutral zero.
-
-![Reward V3 decision rules](docs/images/reward-v3-decision-rules.png)
+- hard requirements and authorized compromises are represented separately;
+- eligible purchases combine completion, preference, price, Gold alignment and
+  a bounded semantic waste cost;
+- wrong purchases use frozen violation-severity rules;
+- unverified purchases and infrastructure-unscorable samples are distinct;
+- strict Gold requires a complete legal terminal order, full key evidence and
+  `reward_valid=true`;
+- SFT, GRPO, development and Final-200 tasks are isolated by task ID and
+  normalized requirement text.
 
 The complete formula, termination rules and evidence requirements are in the
-[Reward v3 design guide](docs/reward-v3.md).
+[Reward v4 design guide](docs/reward-v4-design.md). The full rebuild and
+evaluation commands are in the [Reward v4 workflow](docs/reward-v4-workflow.md).
 
 ## Repository map
 
@@ -319,7 +312,7 @@ data/
   sft/                           800 train + 200 validation trajectories
   grpo/                          ready-to-train JSONL and veRL Parquet
   evaluation/                    curated Final-200 Clean held-out set
-docs/                            one guide for each tutorial stage and Reward v3
+docs/                            one guide for each tutorial stage and Reward v4
 environments/ShopSimulator/      embedded environment and product archive
 experiments/
   baseline/                      baseline config and result summary
@@ -376,7 +369,8 @@ bash scripts/grpo.sh --logger swanlab
 - [Held-out evaluation](docs/evaluation.md)
 - [Final-200 Clean evaluation dataset](docs/evaluation-dataset.md)
 - [Final-200 Benchmark Dashboard (historical)](docs/evaluation-dashboard.html)
-- [Reward v3 design](docs/reward-v3.md)
+- [Reward v4 design](docs/reward-v4-design.md)
+- [Reward v4 complete rerun workflow](docs/reward-v4-workflow.md)
 - [Auditable experiment results](experiments/comparison.md)
 
 ## Future improvement plan

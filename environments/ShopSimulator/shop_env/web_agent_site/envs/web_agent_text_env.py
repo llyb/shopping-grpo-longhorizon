@@ -39,6 +39,12 @@ from web_agent_site.engine.config import (
     ENVIRONMENT_VERSION,
     load_config,
 )
+from web_agent_site.engine.evidence import (
+    candidate_quality,
+    new_ledger,
+    public_ledger,
+    record_observation,
+)
 from web_agent_site.utils import (BASE_DIR, DEFAULT_FILE_PATH, random_idx)
 
 PROMPT_TEMPLATE_zh="""你正在进行一次网上购物模拟，目标是从商品库中选购最符合需求的商品。请注意，商品库中存在大量同类商品，你必须通过合理操作，最终购买到最符合要求的目标商品。
@@ -195,9 +201,42 @@ class WebAgentTextEnv(gym.Env):
             status = self.browser.click(action_arg, self.text_to_clickable)
         else:
             status = dict(reward=0, done=False)
+            session_state = self.server.user_sessions.get(self.session)
+            if isinstance(session_state, dict):
+                session_state["invalid_action_count"] = int(
+                    session_state.get("invalid_action_count", 0)
+                ) + 1
 
         # Update observation, state with the new action
         ob = self.observation
+        session_state = self.server.user_sessions.get(self.session)
+        if isinstance(session_state, dict) and not status.get("done"):
+            public_observation = self.structured_observation()
+            record_observation(
+                session_state["evidence_ledger"],
+                public_observation,
+                step=session_state["progress_tracker"].steps + 1,
+            )
+            # Candidate eligibility is computed only after the current
+            # structured observation has been entered in the actor evidence
+            # ledger.  Evaluating from backend product facts in ``item_page``
+            # would make an unseen acceptable SKU justify stopping.
+            if public_observation.get("page_type") in {"product_detail", "information_subpage"} and session_state.get("asin"):
+                product_info = self.server.product_item_dict[session_state["asin"]]
+                eligibility = evaluate_candidate_eligibility(
+                    product_info,
+                    session_state["goal"],
+                    evidence=public_ledger(session_state["evidence_ledger"]),
+                    selected_options=session_state.get("options") or {},
+                    price_resolution=session_state.get("price_resolution"),
+                )
+                session_state.setdefault("candidate_eligibility", {})[
+                    session_state["asin"]
+                ] = eligibility
+                if eligibility["known_valid"]:
+                    session_state.setdefault("known_valid_asins", set()).add(
+                        session_state["asin"]
+                    )
         if not status.get("done"):
             progress = self.server.record_progress(
                 self.session,
@@ -361,6 +400,17 @@ class WebAgentTextEnv(gym.Env):
         self.text_to_clickable = None
         self.instruction_text = self.get_instruction_text() if instruction_text is None else instruction_text
         obs = self.observation
+        # The reset response is the first observation actually shown to the
+        # actor.  Store it before any action is processed so a one-step legal
+        # purchase can satisfy the Reward v4 evidence gate.  Later action
+        # observations are recorded by ``step`` with their progress step.
+        session_state = self.server.user_sessions.get(self.session)
+        if isinstance(session_state, dict) and session_state.get("evidence_ledger") is not None:
+            record_observation(
+                session_state["evidence_ledger"],
+                self.structured_observation(),
+                step=0,
+            )
         self.prev_obs = [obs]
         self.prev_actions = []
         self.history = self.history_init[:]
@@ -635,19 +685,6 @@ class SimServer:
         session["price_resolution"] = price_resolution
         session["selected_price"] = selected_price
         session["subpage"] = None
-        if session.get("asin"):
-            eligibility = evaluate_candidate_eligibility(
-                product_info,
-                session["goal"],
-            )
-            session.setdefault("candidate_eligibility", {})[
-                session["asin"]
-            ] = eligibility
-            if eligibility["known_valid"]:
-                session.setdefault("known_valid_asins", set()).add(
-                    session["asin"]
-                )
-
         url = (
             f'{self.base_url}/item_page/{session_id}/'
             f'{session["asin"]}/{keywords_url_string}/'
@@ -718,6 +755,11 @@ class SimServer:
             selected_options=session["options"],
             price_resolution=session.get("price_resolution"),
             rewards=self.environment_config["reward"],
+            evidence=public_ledger(
+                session.get("evidence_ledger"),
+                redundant_actions=session["progress_tracker"].redundant_actions,
+                invalid_actions=session.get("invalid_action_count", 0),
+            ),
         )
         reward, info = result.reward, result.to_dict()
 
@@ -792,6 +834,15 @@ class SimServer:
             known_acceptable_candidates=len(
                 session.get("known_valid_asins") or ()
             ),
+            candidate_quality=candidate_quality(
+                session.get("evidence_ledger"),
+                session.get("goal", {}).get("reward_contract"),
+            ),
+            waste_cost=min(
+                0.05,
+                0.01 * session["progress_tracker"].redundant_actions
+                + 0.01 * int(session.get("invalid_action_count", 0)),
+            ),
             rewards=self.environment_config["reward"],
         )
         return self._terminal_status(session_id, result)
@@ -865,6 +916,8 @@ class SimServer:
                         'price_resolution': None,
                         'candidate_eligibility': {},
                         'known_valid_asins': set(),
+                        'evidence_ledger': new_ledger(),
+                        'invalid_action_count': 0,
                         'progress_tracker': EvidenceProgressTracker(
                             max_steps=self.max_steps,
                             exact_repeat_limit=int(

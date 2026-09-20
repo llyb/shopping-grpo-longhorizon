@@ -16,6 +16,12 @@ ROOT = Path(__file__).resolve().parents[1]
 STAGES = ("a", "b", "c")
 
 
+def _command_path(value) -> str:
+    """Use shell-portable separators in generated commands on every host."""
+
+    return str(value).replace("\\", "/")
+
+
 def build_stage_commands(
     manifest,
     *,
@@ -44,23 +50,25 @@ def build_stage_commands(
         model = (
             base_model
             if stage == "a"
-            else str(Path(output_root) / f"stage-{STAGES[STAGES.index(stage) - 1]}" / "merged")
+            else _command_path(
+                Path(output_root) / f"stage-{STAGES[STAGES.index(stage) - 1]}" / "merged"
+            )
         )
         train = [
             str(python),
-            str(ROOT / "scripts/train_lora_sft.py"),
+            _command_path(ROOT / "scripts/train_lora_sft.py"),
             "--model",
-            str(model),
+            _command_path(model),
             "--train",
-            str(source),
+            _command_path(source),
             "--validation",
-            str(source),
+            _command_path(source),
             "--curriculum-manifest",
-            str(manifest_path),
+            _command_path(manifest_path),
             "--curriculum-stage",
             stage,
             "--output",
-            str(stage_root / "adapter"),
+            _command_path(stage_root / "adapter"),
             "--epochs",
             str(stage_config["epochs"]),
             "--learning-rate",
@@ -82,16 +90,16 @@ def build_stage_commands(
         if liger_kernel:
             train.append("--liger-kernel")
         if index == 0 and resume_from_checkpoint:
-            train.extend(["--resume-from-checkpoint", str(resume_from_checkpoint)])
+            train.extend(["--resume-from-checkpoint", _command_path(resume_from_checkpoint)])
         merge = [
             str(python),
-            str(ROOT / "scripts/merge_lora_adapter.py"),
+            _command_path(ROOT / "scripts/merge_lora_adapter.py"),
             "--base-model",
-            str(model),
+            _command_path(model),
             "--adapter",
-            str(stage_root / "adapter"),
+            _command_path(stage_root / "adapter"),
             "--output",
-            str(stage_root / "merged"),
+            _command_path(stage_root / "merged"),
             "--bf16",
         ]
         commands.append({"stage": stage, "train": train, "merge": merge})

@@ -79,10 +79,14 @@ def project_observation(
     raw_buttons = clickable_buttons(observation)
     raw_asins = product_ids(observation)
     page_type = _page_type(observation)
-    effective_budget = {
-        "search_results": token_budget,
-        "product_detail": detail_token_budget,
-    }.get(page_type, generic_token_budget)
+    if page_type == "search_results":
+        effective_budget = token_budget
+    elif page_type == "product_detail" or (
+        page_type == "information_subpage" and "[SHOPPING_OBSERVATION_V2]" in observation
+    ):
+        effective_budget = detail_token_budget
+    else:
+        effective_budget = generic_token_budget
     # 短 observation 原样保留；只有超预算时才压缩，避免不必要地改变模型输入。
     if raw_tokens <= effective_budget:
         visible = observation
@@ -95,6 +99,19 @@ def project_observation(
                 count_tokens=count_tokens,
                 token_budget=effective_budget,
                 search_top_k=search_top_k,
+            )
+        elif (
+            page_type in {"product_detail", "information_subpage"}
+            and "[SHOPPING_OBSERVATION_V2]" in observation
+        ):
+            # Reward v4's evidence ledger is populated from these exact public
+            # structured fields.  Truncating a detail page here would let the
+            # server count facts that were never delivered to the actor.  A
+            # too-large detail observation therefore invalidates the sample
+            # instead of producing a falsely verified purchase reward.
+            raise ObservationProjectionError(
+                "structured product page exceeds the detail token budget; "
+                "refusing to truncate reward evidence"
             )
         else:
             visible = _project_generic_page(
@@ -152,11 +169,10 @@ def project_observation(
 
 
 def _page_type(observation):
-    if (
-        "[SHOPPING_OBSERVATION_V2]" in observation
-        and "page_type: search_results" in observation
-    ):
-        return "search_results"
+    if "[SHOPPING_OBSERVATION_V2]" in observation:
+        match = re.search(r"(?m)^page_type: (search_results|product_detail|information_subpage)$", observation)
+        if match:
+            return match.group(1)
     if re.search(r"(?:^|\[SEP\]\s*)Page \d+", observation) and product_ids(observation):
         return "search_results"
     buttons = {button.casefold() for button in clickable_buttons(observation)}

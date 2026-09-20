@@ -108,7 +108,13 @@ class EvaluationDatasetTests(unittest.TestCase):
                     instruction["instruction"]
                 ),
             }
-            goal.update(compile_reward_features(instruction, target))
+            goal.update(
+                compile_reward_features(
+                    instruction,
+                    target,
+                    include_contract=True,
+                )
+            )
             selected, _ = candidate_options_for_evaluation(
                 product, goal["required_options_by_key"]
             )
