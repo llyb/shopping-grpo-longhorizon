@@ -6,8 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="c31d9717-fc35-4958-9644-7d7a1c923c2b" name="Changes" comment="feat:升级为rewardv4">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/data-collection.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/data-collection.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/evaluation-dataset.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/evaluation-dataset.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/reward-v4-workflow.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/reward-v4-workflow.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/build_final_rubrics.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/build_final_rubrics.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/shopping_grpo/evaluation/model_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/shopping_grpo/evaluation/model_client.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,7 +36,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "reward-v4",
-    "last_opened_file_path": "F:/shopping-grpo-longhorizon",
+    "last_opened_file_path": "D:/shopping-grpo-longhorizon",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -44,6 +45,11 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\shopping-grpo-longhorizon" />
+    </key>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">

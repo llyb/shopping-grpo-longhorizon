@@ -59,6 +59,16 @@ class RubricBuildError(RuntimeError):
     """Raised when a Final-200 task cannot pass the construction gate."""
 
 
+SCHEMA_RETRY_HINT = (
+    "上一次 JSON 未通过代码门禁。只修正 Schema/Query 原文引用问题，"
+    "不得新增候选、修改底层字段或期望值；重新输出唯一 JSON 对象。"
+)
+PROVIDER_RETRY_HINT = (
+    "上一次请求没有返回可用的 JSON 文本。请重新输出唯一 JSON 对象，"
+    "不要输出 Markdown 代码块或解释性前后缀。"
+)
+
+ 
 def _normalize_base_url(value: str) -> str:
     value = str(value or "").strip().rstrip("/")
     if value.endswith("/chat/completions"):
@@ -96,6 +106,14 @@ def _write_jsonl(path: Path, rows: list[Mapping[str, Any]]) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as stream:
         for row in rows:
             stream.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def _append_jsonl(stream: Any, row: Mapping[str, Any]) -> None:
+    """Persist one finished task immediately so a later crash cannot lose it."""
+
+    stream.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    stream.flush()
+    os.fsync(stream.fileno())
 
 
 def _load_products(path: Path) -> list[dict]:
@@ -213,7 +231,15 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL"))
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
     parser.add_argument("--rubric-version", default="rubric-final200-v1")
-    parser.add_argument("--max-tokens", type=int, default=2048)
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=4096,
+        help=(
+            "输出上限。教师网关对 deepseek-v4 / glm 系列默认开启思考，"
+            "思考也会计入该预算，2048 可能只剩空 content，故默认放宽到 4096。"
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--schema-retries", type=int, default=2)
@@ -275,7 +301,17 @@ def main() -> None:
             thinking=False,
         )
 
-    for facts, candidates in zip(facts_rows, candidate_rows):
+    response_stream = None
+    rubric_stream = None
+    if not args.build_candidates_only:
+        # 逐题追加落盘：任何一题彻底失败都不会丢掉前面已完成的结果，重跑会跳过它们。
+        response_stream = paths["responses"].open("a", encoding="utf-8", newline="\n")
+        rubric_stream = paths["rubrics"].open("a", encoding="utf-8", newline="\n")
+
+    total = len(task_ids)
+    for index, (facts, candidates) in enumerate(
+        zip(facts_rows, candidate_rows), start=1
+    ):
         task_id = int(facts["task_id"])
         if task_id in existing_rubrics:
             rubric = validate_rubric_bundle(
@@ -284,17 +320,28 @@ def main() -> None:
             rubric_rows.append(rubric)
             if any(item.get("hardness") == "needs_review" for item in rubric.get("rubrics", [])):
                 review_rows.append(rubric)
+            print(
+                f"[{index}/{total}] task {task_id} reused from existing rubrics",
+                flush=True,
+            )
             continue
         if args.build_candidates_only:
             continue
-        messages = build_rubric_curator_messages(
+        base_messages = build_rubric_curator_messages(
             task_id=task_id,
             query=facts["query"],
             candidates=candidates["candidates"],
         )
         last_error = None
         response_payload = None
+        retry_hint = SCHEMA_RETRY_HINT
         for attempt in range(args.schema_retries + 1):
+            messages = base_messages
+            if attempt:
+                # 每轮只带一条修正提示，避免把提示重复追加进历史。
+                messages = base_messages + [
+                    {"role": "user", "content": retry_hint}
+                ]
             try:
                 response_payload = client.complete_json(messages)
                 response = _strict_curator_response(
@@ -315,15 +362,16 @@ def main() -> None:
                     raise RubricBuildError(
                         f"task {task_id} failed Rubric gate after {attempt + 1} attempts: {last_error}"
                     ) from exc
-                messages = messages + [
-                    {
-                        "role": "user",
-                        "content": (
-                            "上一次 JSON 未通过代码门禁。只修正 Schema/Query 原文引用问题，"
-                            "不得新增候选、修改底层字段或期望值；重新输出唯一 JSON 对象。"
-                        ),
-                    }
-                ]
+                retry_hint = (
+                    SCHEMA_RETRY_HINT
+                    if isinstance(exc, ContractValidationError)
+                    else PROVIDER_RETRY_HINT
+                )
+                print(
+                    f"[{index}/{total}] task {task_id} attempt "
+                    f"{attempt + 1} rejected: {last_error}",
+                    flush=True,
+                )
         response_record = {
             "task_id": task_id,
             "task_data_hash": facts["task_data_hash"],
@@ -334,6 +382,19 @@ def main() -> None:
         rubric_rows.append(rubric)
         if any(item.get("hardness") == "needs_review" for item in rubric.get("rubrics", [])):
             review_rows.append(rubric)
+        _append_jsonl(response_stream, response_record)
+        _append_jsonl(rubric_stream, rubric)
+        print(
+            f"[{index}/{total}] task {task_id} ok: "
+            f"attempt={response_payload.get('metadata', {}).get('attempts')} "
+            f"constraints={len(rubric.get('rubrics', []))} "
+            f"needs_review={sum(1 for item in rubric.get('rubrics', []) if item.get('hardness') == 'needs_review')}",
+            flush=True,
+        )
+
+    for stream in (response_stream, rubric_stream):
+        if stream is not None:
+            stream.close()
 
     if not args.build_candidates_only:
         _write_jsonl(paths["responses"], sorted(response_rows, key=lambda row: int(row["task_id"])))

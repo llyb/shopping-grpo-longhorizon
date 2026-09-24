@@ -20,9 +20,9 @@
 ```bash
 export ROOT="$(pwd)"
 export RUN_ROOT="$ROOT/outputs/reward-v4-$(date +%Y%m%d-%H%M%S)"
-export BASE_MODEL="/absolute/path/to/your/base-model"
+export BASE_MODEL="$ROOT/models/Qwen3.5-2B" 
 export OPENAI_BASE_URL="http://10.128.202.100:3010/v1"
-export OPENAI_MODEL="glm-5.2"
+export OPENAI_MODEL="qwen3.7-max"
 read -rsp 'OPENAI_API_KEY: ' OPENAI_API_KEY && echo
 export OPENAI_API_KEY
 
