@@ -18,7 +18,7 @@ class CollectSftDataCliTests(unittest.TestCase):
         with patch.object(sys, "argv", ["collect_sft_data.py", "--tasks", "tasks.jsonl"]):
             args = parse_args()
 
-        self.assertEqual(args.model, "deepseek-v4-flash")
+        self.assertEqual(args.model, "deepseek/deepseek-v4-flash")
         self.assertEqual(args.base_url, "http://127.0.0.1:5700")
         self.assertEqual(args.max_steps, 35)
         self.assertEqual(args.output_dir, Path("outputs/sft-collection"))

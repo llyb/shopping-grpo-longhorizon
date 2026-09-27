@@ -319,6 +319,27 @@ def build_task_facts(
     return payload
 
 
+def reusable_cached_rubric(
+    cached: Mapping,
+    *,
+    task_id: int,
+    curator_model: str,
+    curator_prompt_version: str,
+):
+    """Reuse a frozen Rubric only when its generation matches this run."""
+
+    bundle = cached.get(task_id)
+    if bundle is None:
+        return None
+    generation = bundle.get("generation")
+    generation = generation if isinstance(generation, dict) else {}
+    if generation.get("curator_model") != curator_model:
+        return None
+    if generation.get("curator_prompt_version") != curator_prompt_version:
+        return None
+    return validate_rubric_bundle(bundle, expected_task_id=task_id)
+
+
 def extract_rubric_candidates(task_facts: object) -> dict:
     """Extract a superset of constraints; Flash must decide which are requested."""
 

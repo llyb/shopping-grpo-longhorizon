@@ -45,6 +45,26 @@ class ComparisonReportTest(unittest.TestCase):
             self.assertEqual(data["models"][0]["reward"]["median"], 0.25)
             self.assertEqual(sum(data["models"][0]["reward"]["histogram"]), 2)
 
+    def test_label_without_hardcoded_analysis_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = root / "sft"
+            run.mkdir()
+            (run / "summary.json").write_text(
+                json.dumps({"protocol": {"model": "SFT Candidate"}}),
+                encoding="utf-8",
+            )
+            (run / "trajectories.jsonl").write_text(
+                json.dumps({"task_id": 1, "final_reward": 1.0}) + "\n",
+                encoding="utf-8",
+            )
+
+            data = build_comparison_data(root)
+
+            self.assertEqual(data["models"][0]["key"], "sft")
+            self.assertIsNone(data["models"][0]["analysis"])
+            self.assertFalse(data["has_analysis"])
+
 
 if __name__ == "__main__":
     unittest.main()

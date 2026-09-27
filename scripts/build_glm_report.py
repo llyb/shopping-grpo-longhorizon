@@ -34,6 +34,19 @@ REWARD_LABELS = {
     "early_abstain": "过早放弃",
     "unknown": "未完成 / 无终局",
 }
+JUDGE_DIMENSION_LABELS = {
+    "search_strategy": "搜索策略",
+    "candidate_utilization": "候选利用",
+    "evidence_verification": "证据核验",
+    "decision_quality": "决策质量",
+    "termination_efficiency": "终止效率",
+}
+RUBRIC_STATUS_LABELS = {
+    "satisfied": "满足",
+    "violated": "违反",
+    "unknown": "证据不足",
+    "not_applicable": "不适用",
+}
 
 
 def _load_jsonl(path: Path):
@@ -43,6 +56,49 @@ def _load_jsonl(path: Path):
 
 def _percent(value, total):
     return round(100 * value / total, 2) if total else 0.0
+
+
+def _judge_summary(run_dir: Path, summary):
+    payload = run_dir / "evaluation_summary.json"
+    if payload.is_file():
+        return json.loads(payload.read_text(encoding="utf-8"))
+    embedded = summary.get("llm_as_judge")
+    return embedded if isinstance(embedded, dict) else None
+
+
+def _judge_data(evaluation_summary, total):
+    quality = evaluation_summary.get("trajectory_quality") or {}
+    rubric = evaluation_summary.get("requirement_rubric") or {}
+    dimensions = quality.get("dimensions") or {}
+    names = list(JUDGE_DIMENSION_LABELS)
+    names.extend(name for name in dimensions if name not in names)
+    return {
+        "expected_tasks": int(evaluation_summary.get("expected_tasks", total)),
+        "coverage": float(quality.get("judge_coverage_rate", 0.0)),
+        "status_counts": quality.get("judge_status_counts") or {},
+        "disagreement_tasks": int(
+            rubric.get("reward_rubric_disagreement_tasks", 0)
+        ),
+        "rubric_status_counts": rubric.get("status_counts") or {},
+        "dimensions": [
+            {
+                "name": name,
+                "label": JUDGE_DIMENSION_LABELS.get(name, name),
+                "mean": float(
+                    (dimensions.get(name) or {}).get(
+                        "mean_score_among_valid_judges", 0.0
+                    )
+                ),
+                "score_counts": (dimensions.get(name) or {}).get(
+                    "score_counts"
+                )
+                or {},
+            }
+            for name in names
+        ],
+        "primary_errors": quality.get("primary_error_counts") or {},
+        "secondary_errors": quality.get("secondary_error_counts") or {},
+    }
 
 
 def build_data(run_dir):
@@ -157,6 +213,7 @@ def build_data(run_dir):
         "guard_counts": dict(guard_counts),
         "tool_counts": dict(tool_counts),
     }
+    evaluation_summary = _judge_summary(run_dir, summary)
     return {
         "meta": {
             "model": model,
@@ -166,9 +223,17 @@ def build_data(run_dir):
             "temperature": protocol.get("temperature", ""),
             "top_p": protocol.get("top_p", ""),
             "reward_contract": protocol.get("reward_contract", summary.get("reward_contract", "")),
+            "judge": bool(
+                (evaluation_summary or {}).get("trajectory_quality")
+            ),
         },
         "summary": compact_summary,
         "charts": charts,
+        "judge": (
+            _judge_data(evaluation_summary, total)
+            if evaluation_summary
+            else None
+        ),
         "rows": rows,
     }
 
@@ -259,6 +324,19 @@ HTML = r'''<!doctype html>
     <div class="card"><h2>协议与数据完整性</h2><div id="protocol"></div></div>
   </section>
 
+  <section class="card" id="judge-card" style="margin-top:16px">
+    <h2>LLM-as-Judge：需求 Rubric 与轨迹质量</h2>
+    <div id="judge-body"></div>
+    <div class="grid two" style="margin-top:8px">
+      <div><h3>五维平均分（0–2，以可信判分为分母）</h3><div id="judge-dimensions"></div></div>
+      <div><h3>需求条目判定分布</h3><div id="judge-rubric-status"></div></div>
+    </div>
+    <div class="grid two" style="margin-top:8px">
+      <div><h3>主要错误类型（primary）</h3><div id="judge-primary-errors"></div></div>
+      <div><h3>次要错误类型（secondary）</h3><div id="judge-secondary-errors"></div></div>
+    </div>
+  </section>
+
   <section class="card" style="margin-top:16px">
     <h2>任务明细</h2>
     <div class="controls"><input id="query-filter" placeholder="搜索 task_id 或用户需求"><select id="outcome-filter"><option value="all">全部结果</option><option value="gold_purchase">严格成功购买</option><option value="partial_alternative_purchase">部分满足购买</option><option value="wrong_purchase">错误购买</option><option value="repeat_loop">重复循环</option><option value="max_steps">达到步数上限</option><option value="early_abstain">过早放弃</option><option value="unknown">未完成 / 无终局</option></select><span class="small" id="row-count"></span></div>
@@ -321,6 +399,25 @@ document.getElementById('protocol').innerHTML = [
   ['模型',M.model], ['任务数',`${S.total}`], ['Reward 契约',M.reward_contract || '未记录'], ['温度 / top-p',`${show(M.temperature)} / ${show(M.top_p)}`], ['最大环境步数',`${show(M.max_steps)}`], ['最大生成 tokens',`${show(M.max_tokens)}`], ['上下文 tokenizer','由评测参数决定'], ['数据校验',`${S.total} 条任务级轨迹`]
 ].map(([k,v]) => `<div class="stat-line"><span class="muted">${k}</span><strong>${v}</strong></div>`).join('');
 
+const J = REPORT_DATA.judge;
+if (!J) {
+  document.getElementById('judge-card').style.display = 'none';
+} else {
+  document.getElementById('judge-body').innerHTML = [
+    `<div class="insight"><strong>Judge 覆盖率：</strong>有效判分 ${J.status_counts.valid || 0} / 期望 ${J.expected_tasks}（${fmtPct(J.coverage)}）；not_judged ${J.status_counts.not_judged || 0}，invalid ${J.status_counts.invalid || 0}。not_judged 与 invalid 仍保留在固定分母中。</div>`,
+    `<div class="insight"><strong>Reward 与 Rubric disagreement：</strong>${J.disagreement_tasks} 题。Reward 结论与逐条需求判断冲突时两者都保留，不互相覆盖。</div>`
+  ].join('');
+  const rubricLabels = {satisfied:'满足',violated:'违反',unknown:'证据不足',not_applicable:'不适用'};
+  const dimItems = J.dimensions.map(item => ({label: item.label, value: item.mean, counts: item.score_counts}));
+  renderBars('judge-dimensions', dimItems, 2, item => `${item.value.toFixed(2)}（0:${item.counts['0'] || 0} 1:${item.counts['1'] || 0} 2:${item.counts['2'] || 0}）`, () => 'purple');
+  const rubricItems = Object.entries(J.rubric_status_counts).map(([key, value]) => ({label: rubricLabels[key] || key, value}));
+  renderBars('judge-rubric-status', rubricItems, Math.max(1, ...rubricItems.map(x => x.value)), item => `${item.value}`, () => 'green');
+  const primaryItems = Object.entries(J.primary_errors).map(([key, value]) => ({label: key, value}));
+  renderBars('judge-primary-errors', primaryItems, Math.max(1, ...primaryItems.map(x => x.value)), item => `${item.value}`, () => 'red');
+  const secondaryItems = Object.entries(J.secondary_errors).map(([key, value]) => ({label: key, value}));
+  renderBars('judge-secondary-errors', secondaryItems, Math.max(1, ...secondaryItems.map(x => x.value)), item => `${item.value}`, () => 'amber');
+}
+
 let sortKey = 'task_id'; let sortAsc = true;
 const queryFilter = document.getElementById('query-filter'); const outcomeFilter = document.getElementById('outcome-filter');
 function renderTable() {
@@ -344,7 +441,7 @@ def parse_args(argv=None):
         "--run-dir",
         type=Path,
         default=ROOT / "outputs" / "evaluation" / "glm-5.2",
-        help="包含 summary.json 和 trajectories.jsonl 的评测目录",
+        help="包含 summary.json、trajectories.jsonl 与可选 evaluation_summary.json 的评测目录",
     )
     parser.add_argument("--output", type=Path, help="HTML 输出路径，默认 <run-dir>/report.html")
     return parser.parse_args(argv)

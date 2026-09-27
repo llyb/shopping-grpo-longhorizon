@@ -182,7 +182,7 @@ class OpenAIChatClient:
             # OpenCode Go defaults DeepSeek V4 to thinking enabled. Omitting the
             # field therefore does not mean disabled; be explicit for this model
             # family without sending a provider-specific field to local vLLM.
-            if self.model.casefold().startswith("deepseek-v4"):
+            if "deepseek-v4" in self.model.casefold():
                 payload["thinking"] = {"type": "disabled"}
         headers = {
             "Content-Type": "application/json",

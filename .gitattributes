@@ -1,0 +1,23 @@
+# 换行符策略：仓库内文本文件一律使用 LF。
+#
+# 背景：Windows 端全局 core.autocrlf=true 会把工作树检出为 CRLF，
+# 导致 shell 脚本带 \r，在 Linux / WSL / 容器里报 "$'\r': command not found"，
+# 并且每次 git 操作都会输出 LF/CRLF 转换警告。
+* text=auto eol=lf
+
+# 二进制文件：禁止换行符转换与文本 diff
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.gz        binary
+*.zip       binary
+*.parquet   binary
+*.safetensors binary
+*.bin       binary
+
+# Windows 脚本必须保留 CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf

@@ -70,7 +70,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("OPENAI_MODEL", "deepseek-v4-flash"),
+        default=os.environ.get("OPENAI_MODEL", "deepseek/deepseek-v4-flash"),
     )
     parser.add_argument("--llm-base-url", default=os.environ.get("OPENAI_BASE_URL"))
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))

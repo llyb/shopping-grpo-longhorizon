@@ -21,3 +21,8 @@ models/
 swanlog/
 wandb/
 logs/
+
+# 编辑器与本地工具目录（原先只写在 .git/info/exclude，现改为仓库共享规则）
+.idea/
+.commandcode/
+.workbuddy/

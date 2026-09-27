@@ -20,6 +20,22 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
+# PyPI 源：默认走清华 TUNA 镜像加速 uv 的下载；海外网络或需要直连官方源时
+# 设置 SHOPPING_PYPI_MIRROR=https://pypi.org/simple 覆盖即可。只影响本脚本的子进程。
+PYPI_MIRROR="${SHOPPING_PYPI_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+export UV_DEFAULT_INDEX="${PYPI_MIRROR}"
+export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-120}"
+
+# 受限或低速网络下可设置 SHOPPING_GIT_MIRROR 让 git 走镜像拉取固定版本的 transformers
+# （例如 SHOPPING_GIT_MIRROR=https://gh-proxy.com）；只影响本脚本的子进程，不写入全局配置。
+GIT_MIRROR="${SHOPPING_GIT_MIRROR:-}"
+if [[ -n "${GIT_MIRROR}" ]]; then
+  GIT_MIRROR="${GIT_MIRROR%/}"
+  export GIT_CONFIG_COUNT=1
+  export GIT_CONFIG_KEY_0="url.${GIT_MIRROR}/https://github.com/.insteadOf"
+  export GIT_CONFIG_VALUE_0="https://github.com/"
+fi
+
 cd "${ROOT}"
 uv sync --python "${MAIN_PYTHON}" --extra sft --extra grpo
 

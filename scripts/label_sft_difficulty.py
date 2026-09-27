@@ -145,7 +145,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--model", default="deepseek-v4-flash")
+    parser.add_argument("--model", default="deepseek/deepseek-v4-flash")
     parser.add_argument("--workers", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=5)
     parser.add_argument("--max-batch-chars", type=int, default=60000)

@@ -118,6 +118,8 @@ def _model_data(run_dir: Path) -> dict:
         "key": run_dir.name,
         "name": protocol.get("model") or run_dir.name,
         "report": f"{run_dir.name}/report.html",
+        "analysis": MODEL_ANALYSIS.get(run_dir.name)
+        or MODEL_ANALYSIS.get(str(protocol.get("model") or "")),
         "tasks": len(rows),
         "successes": int(summary.get("strict_successes", len(success_ids))),
         "success_rate": float(summary.get("strict_success_rate", len(success_ids) / len(rows))),
@@ -189,7 +191,7 @@ def build_comparison_data(evaluation_dir: Path) -> dict:
             if all(task_id in set(model["success_ids"]) for model in models)
         ),
         "best_model": best["name"],
-        "analysis": MODEL_ANALYSIS,
+        "has_analysis": any(model["analysis"] for model in models),
     }
 
 
@@ -221,7 +223,7 @@ table{border-collapse:collapse;width:100%;min-width:900px}th,td{padding:10px;bor
 <section class="card wide"><h2>核心结论：强模型强在哪</h2><div id="strengths"></div></section>
 <section class="card wide"><h2>各模型主要 Bad Case</h2><div class="notes" id="model-notes"></div></section>
 <section class="card wide"><h2>跨模型共性</h2><div id="common-notes"></div><h3>所有模型都没做对的任务（<span id="all-failed-count"></span>）</h3><div class="task-ids" id="all-failed"></div><h3 style="margin-top:16px">所有模型都做对的任务（<span id="all-succeeded-count"></span>）</h3><div class="task-ids" id="all-succeeded"></div></section>
-<section class="card wide"><h2>需要谨慎解读的评测数据</h2><div id="data-notes"></div></section>
+<section class="card wide" id="caveat-card"><h2>需要谨慎解读的评测数据</h2><div id="data-notes"></div></section>
 </div></main>
 <script>
 const D=__REPORT_DATA__;
@@ -241,11 +243,21 @@ document.querySelector('#hist-labels').innerHTML='<b></b>'+D.histogram_labels.ma
 document.querySelector('#legend').innerHTML=D.outcome_order.map(k=>`<span><i style="background:${COLORS[k]}"></i>${LABELS[k]}</span>`).join('');
 document.querySelector('#outcomes').innerHTML=sorted.map(m=>`<div class="outcome-row"><b>${esc(m.name)}</b><div class="stack">${D.outcome_order.map(k=>`<div class="seg" title="${LABELS[k]}：${m.outcomes[k]||0}" style="width:${(m.outcomes[k]||0)/m.tasks*100}%;background:${COLORS[k]}"></div>`).join('')}</div></div>`).join('');
 const best=sorted[0], weakest=sorted[sorted.length-1];
-document.querySelector('#strengths').innerHTML=`<p><b>${esc(best.name)}</b> 是这批里最稳的：严格成功 ${best.successes}/${best.tasks}（${pct(best.success_rate)}），平均只走 ${best.average_steps.toFixed(2)} 步。它不是“想得更久”，而是更常在前几次搜索里锁定靠谱候选，利用商品页已有的标题、属性、规格和价格，够用就选、选完就买。</p><p>和 GLM-5.2 逐题比，两者共同做对 114 题；Qwen Max 单独做对 35 题，GLM 单独做对 11 题。Qwen Max 的成功轨迹平均 7.44 步，GLM 是 9.31 步。GLM 的主要损失是 49 条 assistant_final——不少轨迹已经想清楚下一步，甚至选好规格，却没有真的发工具调用。</p><p>最明显的差距在“能不能收尾”：${esc(best.name)} 的重复循环只有 ${best.outcomes.repeat_loop||0} 条、未形成终局 ${best.outcomes.unknown||0} 条；${esc(weakest.name)} 分别是 ${weakest.outcomes.repeat_loop||0} 和 ${weakest.outcomes.unknown||0}。强模型少走回头路，也更少在已经接近答案时卡住。不过 Qwen Max 偶尔太果断，会把近似商品当答案；改进方向是加一遍轻量规格检查，不是学 GLM 把所有空页签都看一遍。</p>`;
-document.querySelector('#model-notes').innerHTML=sorted.map(m=>{const a=D.analysis[m.key];return `<article class="note"><h3>${esc(m.name)}</h3><p><b>${esc(a.portrait)}</b></p><ul>${a.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p><b>怎么改：</b>${esc(a.fix)}</p></article>`}).join('');
-document.querySelector('#common-notes').innerHTML=`<p><b>第一类是“看标题就退”。</b>候选标题不够像时，模型常常打开后立即返回，没有继续看完整属性、规格轴和变体价；这在 Qwen Plus（64 个 bad case）、DeepSeek Pro（29 个）和 DeepSeek Flash（28 个）里尤其明显。</p><p><b>第二类是“找到后不收口”。</b>正确候选已经出现，模型仍换同义搜索词、重复打开商品或来回切规格。强模型 Qwen Max 只有 4 个 repeat_loop，Qwen Plus 有 70 个，差距主要就在这里。</p><p><b>第三类是“规格轴没管住”。</b>型号、颜色、尺码、容量、数量经常只选一部分，或者点过但最终购买状态没保留。预算也应按最终变体价核对，而不是拿列表价格凭感觉。</p><p><b>第四类是“页面状态没跟上”。</b>模型拿旧页面的 ASIN/按钮继续点，或给无参工具乱传参数。DeepSeek Pro 的 29 条 invalid_action_limit 是最集中的系统性问题。</p><p>${D.all_failed_task_ids.length} 道题六个模型全败，说明这部分通常有大量近似品，必须靠详情或精确规格区分；${D.all_succeeded_task_ids.length} 道题六个模型全对，说明基础搜索和明显匹配项并不是主要瓶颈。</p>`;
+document.querySelector('#strengths').innerHTML=[
+  `<p><b>${esc(best.name)}</b> 严格成功率最高：${best.successes}/${best.tasks}（${pct(best.success_rate)}），平均 ${best.average_steps.toFixed(2)} 步；重复循环 ${best.outcomes.repeat_loop||0} 题，未形成终局 ${best.outcomes.unknown||0} 题。</p>`,
+  `<p><b>${esc(weakest.name)}</b> 最低：${weakest.successes}/${weakest.tasks}（${pct(weakest.success_rate)}），平均 ${weakest.average_steps.toFixed(2)} 步；重复循环 ${weakest.outcomes.repeat_loop||0} 题，未形成终局 ${weakest.outcomes.unknown||0} 题。</p>`,
+  `<p>两者严格成功率相差 ${((best.success_rate-weakest.success_rate)*100).toFixed(1)} 个百分点。报告不生成综合总分：Reward 与终局、Query Rubric、轨迹质量、确定性行为四个面板各自独立解读。</p>`
+].join('');
+document.querySelector('#model-notes').innerHTML=sorted.map(m=>{const a=m.analysis;if(!a){return `<article class="note"><h3>${esc(m.name)}</h3><p>未提供人工 bad case 分析。严格成功 ${m.successes}/${m.tasks}（${pct(m.success_rate)}），重复循环 ${m.outcomes.repeat_loop||0} 题，未形成终局 ${m.outcomes.unknown||0} 题。逐题细节见该模型单模型报告。</p></article>`}return `<article class="note"><h3>${esc(m.name)}</h3><p><b>${esc(a.portrait)}</b></p><ul>${a.bullets.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p><b>怎么改：</b>${esc(a.fix)}</p></article>`}).join('');
+const repeatTotal=sorted.reduce((a,m)=>a+(m.outcomes.repeat_loop||0),0);const unknownTotal=sorted.reduce((a,m)=>a+(m.outcomes.unknown||0),0);
+document.querySelector('#common-notes').innerHTML=[
+  `<p>${D.all_failed_task_ids.length} 道题所有模型都没做对，通常意味着存在大量近似商品，需要靠详情或精确规格区分；${D.all_succeeded_task_ids.length} 道题全部做对，说明基础搜索和明显匹配项不是主要瓶颈。</p>`,
+  `<p>跨模型合计：重复循环 ${repeatTotal} 题、未形成终局 ${unknownTotal} 题。这两类通常对应“找到后不收口”和“信息足够却没有落成终局动作”。</p>`,
+  `<p>共 ${D.models.length} 个模型参与比较。逐题的严格成功迁移、Reward type 迁移、hard violation 差值和五维分数差值见 <code>model_comparison.json</code>。</p>`
+].join('');
 document.querySelector('#data-notes').innerHTML=`<p>raw bad 数不能全当成模型真实错误。逐轨迹检查发现几类疑似标签/比较器问题：</p><ul><li><b>需求与 gold 冲突：</b>5703 用户明确要 7 号机针，gold 却要 8 号；21785 用户要 2XL，gold 却是 XL；5510 用户要 L 码，gold 却含 S-2只装。</li><li><b>需求没写、gold 却强制：</b>4786 没写尺码却要求 XL女175；3368 只要求高度 15cm 以下，9cm 合理但 gold 强制 12cm。</li><li><b>字符归一化：</b>11168、5904、2352、12860 存在 ➕、爱心、大小写等字符串看起来等价却匹配失败。</li><li><b>口语预算被当硬上限：</b>“60 元出头”买 62、“40 左右”买 45、“170 上下”买 171 都会被判失败。报告保留官方严格成功率，但这些案例不宜直接归因于模型推理。</li></ul>`;
 document.querySelector('#all-failed-count').textContent=D.all_failed_task_ids.length;document.querySelector('#all-failed').textContent=D.all_failed_task_ids.join(', ');document.querySelector('#all-succeeded-count').textContent=D.all_succeeded_task_ids.length;document.querySelector('#all-succeeded').textContent=D.all_succeeded_task_ids.join(', ');
+if(!D.has_analysis){document.getElementById('caveat-card').style.display='none';}
 </script></body></html>'''
 
 

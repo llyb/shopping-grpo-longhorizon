@@ -9,5 +9,8 @@ for run_dir in "$EVALUATION_DIR"/*; do
   "$ROOT/.venv/bin/python" "$ROOT/scripts/build_eval_report.py" --run-dir "$run_dir"
 done
 
+"$ROOT/.venv/bin/python" "$ROOT/scripts/build_model_comparison.py" \
+  --evaluation-dir "$EVALUATION_DIR"
+
 exec "$ROOT/.venv/bin/python" "$ROOT/scripts/build_comparison_report.py" \
   --evaluation-dir "$EVALUATION_DIR"

@@ -248,12 +248,16 @@ bash scripts/start_environment.sh
 在第二个终端启动基础模型：
 
 ```bash
-bash scripts/serve_model.sh Qwen/Qwen3.5-2B
+bash scripts/serve_model.sh models/Qwen3.5-2B
 ```
 
 在第三个终端评估：
 
 ```bash
+# 评测同时生成 Rubric（V4 Flash）和轨迹 Judge（V4 Pro）结果。
+# 两个 Judge 使用独立的 OpenAI-compatible 服务；JUDGE_BASE_URL 是必填项。
+export JUDGE_BASE_URL=https://your-judge-endpoint.example/v1
+export JUDGE_API_KEY=your-judge-key
 bash scripts/baseline.sh
 ```
 
@@ -310,7 +314,14 @@ bash scripts/report.sh grpo
 bash scripts/report_all.sh
 ```
 
-报告生成器按评测目录读取 `summary.json` 和 `trajectories.jsonl`，模型名与评测参数会从结果中自动填入，因此换模型或换评测标签不需要修改报告代码。
+报告生成器按评测目录读取 `summary.json`、`trajectories.jsonl` 和 `evaluation_summary.json`，模型名与评测参数会从结果中自动填入，因此换模型或换评测标签不需要修改报告代码；单模型报告会额外渲染 LLM-as-Judge 的 Rubric 判定、五维分布和错误类型面板。
+
+评测目录还会保存 `shared/task_facts.jsonl`、`shared/rubric_candidates.jsonl`、
+`shared/rubrics.jsonl`，以及每个模型目录下的 `judge_requests.jsonl`、`judges.jsonl`、
+`evaluations.jsonl` 和 `evaluation_summary.json`。其中 Rubric 由 V4 Flash 生成一次后缓存，
+V4 Pro 只读取脱敏后的 Actor 可见轨迹；基础设施无效的轨迹会保留在分母中并标记为
+`not_judged`。`bash scripts/report_all.sh` 还会按 `task_id` 配对比较各模型，写出
+`outputs/evaluation/model_comparison.json`。
 
 Checkpoint、Rollout 和日志统一写入 Git 忽略的 `outputs/`。
 
@@ -354,16 +365,114 @@ src/shopping_grpo/
 tests/                           核心单元、入口和 Wheel 安装检查
 ```
 
-## 常用配置
+## 脚本环境变量
+
+下面列出的变量都是仓库脚本实际读取的变量。未列出的参数请按各脚本的命令行参数传入，
+不要把它们写成新的兼容启动器。
+
+### 安装与 ShopSimulator
+
+| 脚本 | 环境变量 | 默认值 |
+|---|---|---|
+| `setup.sh` | `MAIN_PYTHON` | `3.12` |
+| `setup.sh` | `SHOPSIM_PYTHON` | `3.10` |
+| `setup.sh` | `SHOPPING_PYPI_MIRROR` | `https://pypi.tuna.tsinghua.edu.cn/simple` |
+| `setup.sh` | `SHOPPING_GIT_MIRROR` | 空（直连 GitHub） |
+| `start_environment.sh` | 无 | 服务地址固定为 `http://127.0.0.1:5700` |
+
+`SHOPPING_PYPI_MIRROR` 只影响 `setup.sh` 中的 `uv sync` 与 `uv pip install`，通过
+`UV_DEFAULT_INDEX` 指向 PyPI 镜像以加速依赖下载（默认清华 TUNA）。海外网络需要直连
+官方源时设为 `https://pypi.org/simple` 即可。
+
+`SHOPPING_GIT_MIRROR` 只影响 `setup.sh` 中拉取固定版本 transformers 的 git
+子进程。当访问 GitHub 缓慢或中断导致 `uv sync` 报错（例如
+`RPC failed; curl 92 HTTP/2 stream 0 was not closed cleanly`）时，把它指向一个
+可用的 GitHub 镜像即可，例如：
+
+```bash
+SHOPPING_GIT_MIRROR=https://gh-proxy.com bash scripts/setup.sh
+```
+
+镜像仅做 URL 前缀改写，拉取的仍是 `pyproject.toml` 中固定的同一个 commit。
+
+### 模型服务、SFT 与 GRPO
+
+| 脚本 | 环境变量 | 默认值 |
+|---|---|---|
+| `serve_model.sh` | `SERVED_MODEL_NAME` | `shopping-agent` |
+| `serve_model.sh` | `LLM_PORT` | `8000` |
+| `sft.sh` | `BASE_MODEL` | `Qwen/Qwen3.5-2B` |
+| `sft.sh` | `SFT_ADAPTER_DIR` | `outputs/models/sft-lora` |
+| `sft.sh` | `SFT_MERGED_DIR` | `outputs/models/sft-merged` |
+| `grpo.sh` | `SWANLAB_API_KEY` | 仅 `--logger swanlab` 时必填 |
+
+`serve_model.sh` 的模型路径是第一个位置参数；`grpo.sh` 的模型、环境地址、输出目录和
+训练数据使用命令行参数，例如：
+
+如果修改 `LLM_PORT`，同时把评测使用的 `LLM_BASE_URL` 改成相同端口。
+
+```bash
+bash scripts/serve_model.sh outputs/models/sft-merged
+bash scripts/grpo.sh --dry-run \
+  --model outputs/models/sft-merged \
+  --env-url http://127.0.0.1:5700 \
+  --output outputs/models/grpo
+```
+
+启用 SwanLab 前先设置：
+
+```bash
+export SWANLAB_API_KEY=...
+bash scripts/grpo.sh --logger swanlab
+```
+
+### 评测
+
+| 脚本 | 环境变量 | 默认值 |
+|---|---|---|
+| `evaluate.sh` | `EVAL_OUTPUT_DIR` | `outputs/evaluation/<label>` |
+| `evaluate.sh` | `SHOPSIM_BASE_URL` | `http://127.0.0.1:5700` |
+| `evaluate.sh` | `LLM_BASE_URL` | `http://127.0.0.1:8000/v1` |
+| `evaluate.sh` | `LLM_API_KEY` | `EMPTY` |
+| `evaluate.sh` | `SERVED_MODEL_NAME` | `shopping-agent` |
+| `evaluate.sh` | `JUDGE_BASE_URL` | 必填；V4 Flash/Pro Judge 服务地址 |
+| `evaluate.sh` | `JUDGE_API_KEY` | `LLM_API_KEY` |
+| `evaluate.sh` | `CURATOR_MODEL` | `deepseek-v4-flash` |
+| `evaluate.sh` | `JUDGE_MODEL` | `deepseek-v4-pro` |
+
+`LLM_BASE_URL`/`LLM_API_KEY` 用于被评测的 Shopping Agent；`JUDGE_BASE_URL`/
+`JUDGE_API_KEY` 用于 Rubric 和轨迹 Judge。两者可以指向同一个 OpenAI-compatible 网关，
+也可以分别指向 Agent 服务和 Judge 服务。完整启动示例：
+
+```bash
+export SHOPSIM_BASE_URL=http://127.0.0.1:5700
+export LLM_BASE_URL=http://127.0.0.1:8000/v1
+export LLM_API_KEY=EMPTY
+export SERVED_MODEL_NAME=shopping-agent
+export JUDGE_BASE_URL=https://your-judge-endpoint.example/v1
+export JUDGE_API_KEY=your-judge-key
+export CURATOR_MODEL=deepseek-v4-flash
+export JUDGE_MODEL=deepseek-v4-pro
+
+bash scripts/evaluate.sh baseline
+```
+
+评测标签是 `evaluate.sh` 的第一个位置参数，例如 `baseline`、`sft` 或 `grpo`；输出目录
+可以通过 `EVAL_OUTPUT_DIR` 覆盖。
+
+### Teacher/SFT 数据采集（需要时）
+
+`collect_sft_data.py` 还读取以下变量：
 
 | 环境变量 | 默认值 |
 |---|---|
-| `BASE_MODEL` | `Qwen/Qwen3.5-2B` |
+| `OPENAI_MODEL` | `deepseek-v4-flash` |
+| `OPENAI_BASE_URL` | 无，需通过环境变量或 `--llm-base-url` 提供 |
+| `OPENAI_API_KEY` | 无，需通过环境变量或 `--api-key` 提供 |
 | `SHOPSIM_BASE_URL` | `http://127.0.0.1:5700` |
-| `LLM_BASE_URL` | `http://127.0.0.1:8000/v1` |
-| `SERVED_MODEL_NAME` | `shopping-agent` |
-| `SFT_ADAPTER_DIR` | `outputs/models/sft-lora` |
-| `SFT_MERGED_DIR` | `outputs/models/sft-merged` |
+
+`sft_curriculum.sh` 可通过 `SFT_PYTHON` 指定 Python 解释器，默认使用仓库的
+`.venv/bin/python`。
 
 GRPO 的高级 Hydra 参数可以追加在 `--` 后：
 
@@ -371,13 +480,6 @@ GRPO 的高级 Hydra 参数可以追加在 `--` 后：
 bash scripts/grpo.sh -- \
   trainer.total_training_steps=20 \
   trainer.save_freq=10
-```
-
-SwanLab 默认关闭，需要时显式启用：
-
-```bash
-export SWANLAB_API_KEY=...
-bash scripts/grpo.sh --logger swanlab
 ```
 
 ## 文档导航

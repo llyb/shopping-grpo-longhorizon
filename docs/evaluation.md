@@ -256,7 +256,7 @@ Pro 明确看不到：
 
 ### 6.2 Pro 的完整 System Prompt
 
-当前冻结版本为 `trajectory-judge-v1-draft-r3`：
+当前冻结版本为 `trajectory-judge-v1-draft-r4`：
 
 ```text
 你是当前 Shopping Agent / ShopSimulator 项目的离线轨迹 Judge。
@@ -347,7 +347,8 @@ Reward 与 Rubric 冲突时两者都保留。例如 Reward 判为 gold，但 Rub
 - Observation 截断和上下文使用；
 - infrastructure-invalid 数量及 task IDs。
 
-汇总时始终以 183 为固定分母。最后按 `task_id` 对 Baseline、SFT、GRPO 做配对比较，
+汇总时始终以 Final-200 Clean 的 200 个任务为固定分母（分母等于 benchmark 清单条目数，
+缺失任务与 `not_judged` 结果都计入分母）。最后按 `task_id` 对 Baseline、SFT、GRPO 做配对比较，
 统计成功状态迁移、Reward type 迁移、hard violation 差值、五维分数差值、步数、
 Guard 和重复动作变化；仍然不生成一个综合总分。
 
@@ -384,6 +385,7 @@ shared/task_facts.jsonl
 shared/rubric_candidates.jsonl
 shared/rubrics.jsonl
 MODEL/trajectories.jsonl
+MODEL/normalized.jsonl
 MODEL/preprocessed.jsonl
 MODEL/judge_requests.jsonl
 MODEL/judges.jsonl
@@ -391,6 +393,12 @@ MODEL/evaluations.jsonl
 MODEL/evaluation_summary.json
 model_comparison.json
 ```
+
+`shared/rubrics.jsonl` 只在 `generation.curator_model` 与
+`generation.curator_prompt_version` 都和当前运行时一致时才被复用，否则按当前
+Prompt 重新生成，避免 Prompt 升级后继续吃旧缓存。`model_comparison.json` 由
+`scripts/build_model_comparison.py` 读取各 `MODEL/evaluations.jsonl` 和
+`data/evaluation/tasks.jsonl` 生成，等价于 `report_all.sh` 的收尾步骤。
 
 完整轨迹和 Judge 请求可能体积较大，因此属于 `outputs/` 运行产物；Git 中只提交
 紧凑的配置与结果摘要。
